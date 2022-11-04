@@ -2,7 +2,7 @@ import torch
 import numpy as np
 import os
 
-#import models
+import models
 import torchvision.models as torch_models
 from torchvision.models.feature_extraction import create_feature_extractor
 from torchvision import transforms
@@ -66,7 +66,11 @@ def load_dataset(dataset, return_torch=True, shuffle_train_set=False, concatenat
     elif dataset == 'mstar':
         hdr, fields, mag, phase = load_MSTAR('data/MSTAR')
         data = polar_transform(mag, phase)
+        #print(data)
+        data = torch.from_numpy(data).float()
         labels, target_names = targets_to_labels(hdr)
+        
+        ##TODO: Change this
         data_train = data[:100, ...]
         data_test = data[100:, ...]
         target_train = labels[:100]
@@ -346,7 +350,7 @@ def train_model(model, criterion, optimizer, scheduler, device, dataloaders, dat
                 # forward
                 # track history if only in train
                 with torch.set_grad_enabled(phase == 'train'):
-                    outputs = model(inputs)
+                    outputs = model(inputs.float())
                     _, preds = torch.max(outputs, 1)
                     outputs = nn.functional.log_softmax(outputs)
                     loss = criterion(outputs, labels)
@@ -494,10 +498,14 @@ def encode_transfer_learning(dataset, model_type = None, epochs = 15, transfer_b
                 model_ft.classifier[1] = nn.Linear(9216, 1024)
                 model_ft.classifier[4] = nn.Linear(1024, 256)
                 model_ft.classifier[6] = nn.Linear(256, 3)
-            else:
+            elif dataset == 'fusar':
                 model_ft = torch_models.shufflenet_v2_x0_5(pretrained=True)
                 num_ftrs = model_ft.fc.in_features
                 model_ft.fc = nn.Linear(num_ftrs, 5)
+            else:
+                model_ft = torch_models.resnet18(pretrained=True)
+                num_ftrs = model_ft.fc.in_features
+                model_ft.fc = nn.Linear(num_ftrs, 10)
         else:
             if model_type == 'AlexNet':
                 model_ft = torch_models.alexnet(pretrained=True)
