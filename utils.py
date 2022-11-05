@@ -714,10 +714,11 @@ def encodeMSTAR(model_path, batch_size = 1000, cuda = True, use_phase = True):
         data = polar_transform(mag, phase)
     else:
         data = np.reshape(mag,(mag.shape[0],1,mag.shape[1],mag.shape[2]))
-    data = torch.from_numpy(data).double() #Changed from float()
+    data = torch.from_numpy(data).float()
     
 
     #Load model
+    #model = models.CVAE()
     model = torch.load(model_path, map_location=device)
     model.eval()
     encoded_data = None
