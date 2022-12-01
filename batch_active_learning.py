@@ -1130,8 +1130,8 @@ def coreset_run_experiment(X, labels, W, coreset, num_iter=1, method='Laplace',
 
         if display:
             plt.scatter(X[act.candidate_inds, 0], X[act.candidate_inds, 1], c=acq_vals)
-            plt.scatter(X[act.current_labeled_set, 0], X[act.current_labeled_set, 1], c='r', marker='*', s=100)
-            plt.scatter(X[batch, 0], X[batch, 1], c='m')
+            plt.scatter(X[act.current_labeled_set, 0], X[act.current_labeled_set, 1], c='r')
+            plt.scatter(X[batch, 0], X[batch, 1], c='m', marker='*', s=100)
             plt.colorbar()
             if savefig:
                 plt.savefig(os.path.join(savefig_folder, 'bal_acq_vals_b' + str(iteration) + '.png'))
