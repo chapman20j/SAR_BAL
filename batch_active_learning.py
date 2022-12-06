@@ -203,9 +203,41 @@ def coreset_dijkstras(G, rad, DEBUGGING=False, data=None, initial=[], randseed=1
             points_seen[tmp2] = 1
 
         if (DEBUGGING):
-            plt.scatter(data[:, 0], data[:, 1])
-            plt.scatter(data[coreset, 0], data[coreset, 1], c='r')
-            plt.scatter(data[perim, 0], data[perim, 1], c='y')
+            square_dataset = np.abs(np.max(data[:, 0]) - np.min(data[:, 0]) - 1) < .05 and np.abs(np.max(data[:, 1]) - np.min(data[:, 1]) - 1) < .05
+                
+            
+            #The following is for the square dataset
+            if square_dataset:
+                #Save the initial dataset also
+                if len(coreset) == 1:
+                    plt.scatter(data[:, 0], data[:, 1])
+                    plt.axis('square')
+                    #plt.tick_params(left=False, bottom=False, labelleft=False, labelbottom=False)
+                    plt.axis('off')
+                    plt.savefig('DAC Plots/coreset0.png',bbox_inches='tight')
+                    plt.show()
+                
+                #For all others, do this
+                plt.scatter(data[:, 0], data[:, 1])
+                plt.axis('square')
+                #plt.tick_params(left=False, bottom=False, labelleft=False, labelbottom=False)
+                plt.axis('off')
+                
+                
+                plt.scatter(data[points_seen==1, 0], data[points_seen==1, 1], c='k')
+                plt.scatter(data[coreset, 0], data[coreset, 1], c='r', s=100)
+                plt.scatter(data[perim, 0], data[perim, 1], c='y')
+                plt.savefig('DAC Plots/coreset' + str(len(coreset)) + '.png',bbox_inches='tight')
+                
+                
+            
+            else:
+                plt.scatter(data[:, 0], data[:, 1])
+                plt.scatter(data[points_seen==1, 0], data[points_seen==1, 1], c='k')
+                plt.scatter(data[coreset, 0], data[coreset, 1], c='r')
+                plt.scatter(data[perim, 0], data[perim, 1], c='y')
+                
+                
             plt.show()
 
         if iterations >= 1000:
@@ -949,6 +981,16 @@ def greedy_optimization(X, this_batch, acq_vals, dist_coeff):
 
 
 ###########################################################################################################
+
+
+#plt.scatter(data[:, 0], data[:, 1])
+#plt.axis('square')
+#plt.tick_params(left=False, bottom=False, labelleft=False, labelbottom=False)
+#plt.axis('off')
+                
+#plt.savefig('DAC Plots/coreset' + str(len(coreset)) + '.png',bbox_inches='tight')
+
+
 ## implement batch active learning function
 def coreset_run_experiment(X, labels, W, coreset, num_iter=1, method='Laplace',
                            display=False, use_prior=False, al_mtd='local_max', debug=False,
@@ -1018,16 +1060,6 @@ def coreset_run_experiment(X, labels, W, coreset, num_iter=1, method='Laplace',
         t_al_s = timeit.default_timer()
     act = al.active_learning(W, train_ind, labels[train_ind], eval_cutoff=min(200, len(X) // 2))
     
-    #print("DEBUGGING FOR THE AL_THING")
-    #print(W)
-    #print(train_ind)
-    #print(labels[train_ind])
-    #print(act)
-    #print(model)
-    #print(act.current_labeled_set)
-    #print(act.current_labels)
-    #print(type(act.current_labeled_set))
-    #print(type(act.current_labels))
 
     u = model.fit(act.current_labeled_set, act.current_labels)  # perform classification with GSSL classifier
     if debug:
@@ -1043,7 +1075,9 @@ def coreset_run_experiment(X, labels, W, coreset, num_iter=1, method='Laplace',
         plt.scatter(X[:, 0], X[:, 1], c=current_label_guesses)
         plt.scatter(X[act.current_labeled_set, 0], X[act.current_labeled_set, 1], c='r')
         if savefig:
-            plt.savefig(os.path.join(savefig_folder, 'bal_coreset_.png'))
+            plt.axis('square')
+            plt.axis('off')
+            plt.savefig(os.path.join(savefig_folder, 'bal_coreset_.png'),bbox_inches='tight')
         plt.show()
 
         print("Size of coreset = ", len(coreset))
@@ -1134,7 +1168,9 @@ def coreset_run_experiment(X, labels, W, coreset, num_iter=1, method='Laplace',
             plt.scatter(X[batch, 0], X[batch, 1], c='m', marker='*', s=100)
             plt.colorbar()
             if savefig:
-                plt.savefig(os.path.join(savefig_folder, 'bal_acq_vals_b' + str(iteration) + '.png'))
+                plt.axis('square')
+                plt.axis('off')
+                plt.savefig(os.path.join(savefig_folder, 'bal_acq_vals_b' + str(iteration) + '.png'),bbox_inches='tight')
             plt.show()
 
         act.update_labeled_data(batch, labels[batch])  # update the active_learning object's labeled set
@@ -1158,7 +1194,9 @@ def coreset_run_experiment(X, labels, W, coreset, num_iter=1, method='Laplace',
             plt.scatter(X[:, 0], X[:, 1], c=current_label_guesses)
             plt.scatter(X[act.current_labeled_set, 0], X[act.current_labeled_set, 1], c='r')
             if savefig:
-                plt.savefig(os.path.join(savefig_folder, 'bal_acq_vals_a' + str(iteration) + '.png'))
+                plt.axis('square')
+                plt.axis('off')
+                plt.savefig(os.path.join(savefig_folder, 'bal_acq_vals_a' + str(iteration) + '.png'),bbox_inches='tight')
             plt.show()
 
             if al_mtd == 'gd_kmeans' or al_mtd == 'rs_kmeans':
