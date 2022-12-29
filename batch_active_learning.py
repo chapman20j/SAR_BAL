@@ -16,16 +16,27 @@ import utils
 
 
 #SKLearn Imports
-from sklearn.utils import check_random_state            # only in k_means stuff... acq_sample
+from sklearn.utils import check_random_state #only in k_means stuff (acq_sample)
 
 
 
-##############################################################################################################
+
+
+################################################################################
+## Default Parameters
+
+#TODO: Update the code to include these as defaults
+DENSITY_RADIUS = .2
+BATCH_SIZE = 15
+
+################################################################################
 ### coreset functions
 def density_determine_rad(G, x, proportion, r_0=1.0, tol=.02):
-    # Determines the radius necessary so that a certain proportion of the data falls in B_r(x)
-    # This is a lazy way and more efficient code could be written in c
-    # The proportion that we seek is (p-tol, p+tol) where tol is some allowable error and p is the desired proportion
+    # Determines the radius necessary so that a certain proportion of the data
+    # falls in B_r(x). This is a lazy way and more efficient code could be
+    # written in c. The proportion that we seek is (p-tol, p+tol) where tol is
+    # some allowable error and p is the desired proportion
+    
     n = G.num_nodes
     r = r_0
     dists = G.dijkstra(bdy_set=[x], max_dist=r)
@@ -68,8 +79,9 @@ def density_determine_rad(G, x, proportion, r_0=1.0, tol=.02):
     return r
 
 
-def coreset_dijkstras(G, rad, DEBUGGING=False, data=None, initial=[], randseed=123, density_info=(False, 0, 1.0),
-                      similarity='euclidean', knn_data=None):
+def coreset_dijkstras(G, rad, DEBUGGING=False, data=None, initial=[],
+        randseed=123, density_info=(False, 0, 1.0), similarity='euclidean',
+        knn_data=None):
     np.random.seed(randseed)
     coreset = initial.copy()
     perim = []
@@ -194,30 +206,23 @@ def coreset_dijkstras(G, rad, DEBUGGING=False, data=None, initial=[], randseed=1
         if (DEBUGGING):
             square_dataset = np.abs(np.max(data[:, 0]) - np.min(data[:, 0]) - 1) < .05 and np.abs(np.max(data[:, 1]) - np.min(data[:, 1]) - 1) < .05
                 
-            
             #The following is for the square dataset
             if square_dataset:
                 #Save the initial dataset also
                 if len(coreset) == 1:
                     plt.scatter(data[:, 0], data[:, 1])
                     plt.axis('square')
-                    #plt.tick_params(left=False, bottom=False, labelleft=False, labelbottom=False)
                     plt.axis('off')
                     plt.savefig('DAC Plots/coreset0.png',bbox_inches='tight')
                     plt.show()
-                
-                #For all others, do this
+                #If not initial, do this
                 plt.scatter(data[:, 0], data[:, 1])
-                plt.axis('square')
-                #plt.tick_params(left=False, bottom=False, labelleft=False, labelbottom=False)
-                plt.axis('off')
-                
-                
                 plt.scatter(data[points_seen==1, 0], data[points_seen==1, 1], c='k')
                 plt.scatter(data[coreset, 0], data[coreset, 1], c='r', s=100)
                 plt.scatter(data[perim, 0], data[perim, 1], c='y')
+                plt.axis('square')
+                plt.axis('off')
                 plt.savefig('DAC Plots/coreset' + str(len(coreset)) + '.png',bbox_inches='tight')
-                
             else:
                 plt.scatter(data[:, 0], data[:, 1])
                 plt.scatter(data[points_seen==1, 0], data[points_seen==1, 1], c='k')
@@ -234,7 +239,7 @@ def coreset_dijkstras(G, rad, DEBUGGING=False, data=None, initial=[], randseed=1
 
 
 
-##############################################################################################################
+################################################################################
 ## util functions for batch active learning
 
 
@@ -264,7 +269,7 @@ def local_maxes_k_new(knn_ind, acq_array, k, top_num, thresh=0):
 
     return local_maxes.astype(int)
 
-###########################################################################################################
+################################################################################
 ## functions of k-means batch active learning
 def random_sample_val(val, sample_num, random_state=None):
     if random_state is None:
@@ -318,14 +323,14 @@ def diff_x_euclidean(X, y, P, epsilon=1e-8):
 
 
 
-###########################################################################################################
+################################################################################
 
 ## implement batch active learning function
 def coreset_run_experiment(X, labels, W, coreset, num_iter=1, method='Laplace',
-                           display=False, use_prior=False, al_mtd='local_max', debug=False,
-                           acq_fun='vopt', knn_data=None, mtd_para=None,
-                           savefig=False, savefig_folder='../BAL_figures', batchsize=5,
-                           dist_metric='euclidean', knn_size=50, q=1, thresholding=0, randseed=0):
+        display=False, use_prior=False, al_mtd='local_max', debug=False,
+        acq_fun='uc', knn_data=None, mtd_para=None, savefig=False,
+        savefig_folder='../BAL_figures', batchsize=BATCH_SIZE, dist_metric='euclidean',
+        knn_size=50, q=1, thresholding=0, randseed=0):
 
     '''
         al_mtd: 'local_max', 'global_max', 'rs_kmeans', 'gd_kmeans', 'acq_sample', 'greedy_batch', 'particle', 'random', 'topn_max'
@@ -341,21 +346,6 @@ def coreset_run_experiment(X, labels, W, coreset, num_iter=1, method='Laplace',
             k, thresh = mtd_para
         else:
             k, thresh = np.inf, 0
-    elif al_mtd == 'gd_kmeans':
-        if mtd_para:
-            alpha, cw, max_iter, normalize = mtd_para
-        else:
-            alpha, cw, max_iter, normalize = 1, None, 200, False
-    elif al_mtd == 'rs_kmeans':
-        if mtd_para:
-            sample_rate, rs_mtd, eik_p, tau, ofs, cw, max_iter, normalize, weighted_dist = mtd_para
-        else:
-            sample_rate, rs_mtd, eik_p, tau, ofs, cw, max_iter, normalize, weighted_dist = 0.05, 'dijkstra', 1.0, 0.1, 0.2, None, 200, False, False
-    elif al_mtd == 'particle':
-        if mtd_para:
-            dist_coeff = mtd_para
-        else:
-            dist_coeff = 1e3
 
     list_num_labels = []
     list_acc = np.array([]).astype(np.float64)
@@ -365,9 +355,6 @@ def coreset_run_experiment(X, labels, W, coreset, num_iter=1, method='Laplace',
         class_priors = gl.utils.class_priors(labels)
     else:
         class_priors = None
-
-    if al_mtd == 'rs_kmeans':
-        W_rs = gl.weightmatrix.knn(X, knn_size, kernel='distance', knn_data=knn_data)
 
     if method == 'Laplace':
         model = gl.ssl.laplace(W, class_priors=class_priors)
@@ -385,19 +372,18 @@ def coreset_run_experiment(X, labels, W, coreset, num_iter=1, method='Laplace',
     elif acq_fun == 'mcvopt':
         acq_f = al.model_change_vopt()
 
-    if debug:
-        t_al_s = timeit.default_timer()
+    #Time at start of active learning
+    t_al_s = timeit.default_timer()
     act = al.active_learning(W, train_ind, labels[train_ind], eval_cutoff=min(200, len(X) // 2))
     
-
-    u = model.fit(act.current_labeled_set, act.current_labels)  # perform classification with GSSL classifier
+    # perform classification with GSSL classifier
+    u = model.fit(act.current_labeled_set, act.current_labels)
     if debug:
         t_al_e = timeit.default_timer()
         print('Active learning setup time = ', t_al_e - t_al_s)
 
     current_label_guesses = model.predict()
-
-    #acc = np.sum(current_label_guesses == labels) / u.shape[0]
+    
     acc = gl.ssl.ssl_accuracy(current_label_guesses, labels, len(act.current_labeled_set))
 
     if display:
@@ -430,6 +416,9 @@ def coreset_run_experiment(X, labels, W, coreset, num_iter=1, method='Laplace',
 
         modded_acq_vals = np.zeros(len(X))
         modded_acq_vals[act.candidate_inds] = acq_vals
+        
+        #TODO: REMOVE THIS
+        #print("Candidate index size", len(act.candidate_inds))
 
         if al_mtd == 'local_max':
             if knn_data:
@@ -437,44 +426,9 @@ def coreset_run_experiment(X, labels, W, coreset, num_iter=1, method='Laplace',
                 # batch = local_maxes_k(knn_ind, modded_acq_vals, k, top_cut, thresh)
         elif al_mtd == 'global_max':
             batch = act.candidate_inds[np.argmax(acq_vals)]
-        elif al_mtd == 'gd_kmeans':
-            batch_inds, clusters, _, _, iterations = k_means_bal(X[act.candidate_inds], acq_vals ** q, batchsize,
-                                                                 initial='k-means++', max_iter=max_iter,
-                                                                 dist_metric=dist_metric,
-                                                                 randseed=randseed, solve_mtd='GD', time_info=False,
-                                                                 energy_val=False,
-                                                                 alpha=alpha, combinatorial_weight=cw, normalize=normalize)
-            batch = act.candidate_inds[batch_inds]
-
-        elif al_mtd == 'rs_kmeans':
-            G_rs = gl.graph(W_rs[act.candidate_inds, :][:, act.candidate_inds])
-            batch_inds, clusters, _, iterations = k_means_bal_randsample(G_rs, X[act.candidate_inds], acq_vals ** q,
-                                                                         batchsize, sample_rate=sample_rate,
-                                                                         initial='k-means++', max_iter=max_iter,
-                                                                         method=rs_mtd, eik_p=eik_p, tau=tau,
-                                                                         ofs=ofs, randseed=randseed, time_info=False,
-                                                                         knn_dist=None, energy_val=False,
-                                                                         combinatorial_weight=cw, normalize=normalize,
-                                                                         weighted_dist=weighted_dist)
-            batch = act.candidate_inds[batch_inds]
         elif al_mtd == 'acq_sample':
             batch_inds = random_sample_val(acq_vals ** q, sample_num=batchsize)
             batch = act.candidate_inds[batch_inds]
-        elif al_mtd == 'greedy_batch':
-            if acq_fun == 'vopt':
-                batch, _, _ = vopt_greedy_batch(X, labels, act, acq_f, model, batch_size=batchsize, given_batch=[])
-            else:
-                raise ValueError('The acquisition function can only be vopt if you want to use the greedy batch active leanring')
-        elif al_mtd == 'greedy_lm':
-            if acq_fun == 'vopt':
-                #Just using default values
-                batch = local_maxes_k_new(knn_ind, modded_acq_vals, np.inf, batchsize, 0)
-                batch, _, _ = vopt_greedy_batch(X, labels, act, acq_f, model, batch_size=batchsize, given_batch=batch)
-            else:
-                raise ValueError('The acquisition function can only be vopt if you want to use the greedy batch active leanring')
-        elif al_mtd == 'particle':
-            batch_init = np.random.choice(act.candidate_inds, size=batchsize, replace=False)
-            _, batch = greedy_optimization(X, batch_init, modded_acq_vals, dist_coeff=dist_coeff)
         elif al_mtd == 'random':
             batch = np.random.choice(act.candidate_inds, size=batchsize, replace=False)
         elif al_mtd == 'topn_max':
@@ -488,8 +442,6 @@ def coreset_run_experiment(X, labels, W, coreset, num_iter=1, method='Laplace',
             t_localmax_e = timeit.default_timer()
             print("Batch Active Learning time = ", t_localmax_e - t_iter_s)
             print("Batch inds:", batch)
-            if al_mtd == 'gd_kmeans' or al_mtd == 'rs_kmeans':
-                print("Number of iterations:", iterations)
 
         if display:
             plt.scatter(X[act.candidate_inds, 0], X[act.candidate_inds, 1], c=acq_vals)
@@ -506,7 +458,6 @@ def coreset_run_experiment(X, labels, W, coreset, num_iter=1, method='Laplace',
 
         u = model.fit(act.current_labeled_set, act.current_labels)
         current_label_guesses = model.predict()
-        #acc = np.sum(current_label_guesses == labels) / u.shape[0]
         acc = gl.ssl.ssl_accuracy(current_label_guesses, labels, len(act.current_labeled_set))
         if debug:
             t_modelfit_e = timeit.default_timer()
@@ -528,21 +479,12 @@ def coreset_run_experiment(X, labels, W, coreset, num_iter=1, method='Laplace',
                 plt.savefig(os.path.join(savefig_folder, 'bal_acq_vals_a' + str(iteration) + '.png'),bbox_inches='tight')
             plt.show()
 
-            if al_mtd == 'gd_kmeans' or al_mtd == 'rs_kmeans':
-                if dist_metric == 'angular':
-                    Y = X[act.candidate_inds] / np.linalg.norm(X[act.candidate_inds], axis=1)[:, None]
-                else:
-                    Y = X[act.candidate_inds].copy()
-                for i in range(len(clusters)):
-                    plt.scatter(Y[clusters[i], 0], Y[clusters[i], 1], alpha=0.35)
-                plt.scatter(X[batch, 0], X[batch, 1], c='black', marker='o', s=100)
-                if savefig:
-                    plt.savefig(os.path.join(savefig_folder, 'bal_kmeans_clusters_' + str(iteration) + '.png'))
-                plt.show()
-
         if debug:
             t_iter_e = timeit.default_timer()
             print("Iteration:", iteration, "Iteration time = ", t_iter_e - t_iter_s)
+    
+    t_end = timeit.default_timer()
+    t_total = t_end - t_al_s
 
     if display:
         plt.plot(np.array(list_num_labels), list_acc)
@@ -553,17 +495,21 @@ def coreset_run_experiment(X, labels, W, coreset, num_iter=1, method='Laplace',
     # reset active learning object
     act.reset_labeled_data()
 
-    return labeled_ind, list_num_labels, list_acc
+    if display:
+        #Don't want to return the time if we are also displaying things
+        return labeled_ind, list_num_labels, list_acc
+    else:
+        return labeled_ind, list_num_labels, list_acc, t_total
 
 
 ## perform batch active learning for several times and show average&highest result
-def perform_al_experiment(dataset_chosen, embedding_mode='just_transfer', acq_fun_list = ['uc', 'vopt', 'mc', 'mcvopt'],
-                          density_radius_param = .5, knn_num=20, num_iter=1, method='Laplace', 
-                          display=False, use_prior=False, al_mtd='local_max', 
-                          debug=False, acq_fun='vopt', knn_data=None, mtd_para=None,
-                           savefig=False, savefig_folder='../BAL_figures', batchsize=5,
-                           dist_metric='euclidean', knn_size=50, q=1, thresholding=0, randseed=0,
-                           experiment_time=10):
+def perform_al_experiment(dataset_chosen, embedding_mode='just_transfer',
+        acq_fun_list = ['uc', 'vopt', 'mc', 'mcvopt'],
+        density_radius_param = .5, knn_num=20, num_iter=1, method='Laplace',
+        display=False, use_prior=False, al_mtd='local_max', debug=False,
+        acq_fun='uc', knn_data=None, mtd_para=None, savefig=False,
+        savefig_folder='../BAL_figures', batchsize=BATCH_SIZE, dist_metric='euclidean',
+        knn_size=50, q=1, thresholding=0, randseed=0, experiment_time=10):
     
     highest_accuracy_list = [0] * len(acq_fun_list)
     average_accuracy_list = [0] * len(acq_fun_list)
@@ -651,7 +597,6 @@ def perform_al_experiment(dataset_chosen, embedding_mode='just_transfer', acq_fu
         W = gl.weightmatrix.knn(X, knn_num, kernel = 'gaussian', knn_data=knn_data)
         G = gl.graph(W)
         end = timeit.default_timer()
-        
         
         print("Embedding Complete")
         print(f"Time taken = {end - start}")
