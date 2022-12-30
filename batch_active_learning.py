@@ -14,11 +14,64 @@ import graphlearning as gl
 
 import utils
 
-
 #SKLearn Imports
 from sklearn.utils import check_random_state #only in k_means stuff (acq_sample)
 
 
+#TODO: Have a type for float or double stuff
+#TODO: Check the typing stuff
+#TODO: REMOVE RANDSEED STUFF
+#Need to go through and change things
+
+
+#MARK: Function comments
+#Please include the exact python type
+#Complex functions. Refer to density_determine_rad for an example
+"""
+Function description
+
+:param p1: description
+    additional details if necessary
+:param p2: description
+...
+:param pn: description
+
+:return:
+    variable 1: description
+    variable 2: description
+"""
+
+#Simple functions. Refer to dist_euclidean for an example
+"""Quick function description"""
+
+
+
+########
+#For type checking
+import functools
+from collections.abc import Iterable
+
+def check_types(fun):
+    @functools.wraps(fun)
+    def types_wrapper(*args, **kwargs):
+        out = fun(*args, **kwargs)
+        print(fun.__name__)
+        print('in')
+        for v in args:
+            print('\t', type(v))
+        for k, v in kwargs.items():
+            print('\t', k, type(v))
+        print('out')
+        if isinstance(out, Iterable):
+            for x in out:
+                print('\t', type(x))
+        else:
+            print('\t', type(out))
+        print()
+        return out
+    return types_wrapper
+
+########
 
 
 
@@ -31,30 +84,50 @@ BATCH_SIZE = 15
 
 ################################################################################
 ### coreset functions
-def density_determine_rad(G, x, proportion, r_0=1.0, tol=.02):
-    # Determines the radius necessary so that a certain proportion of the data
-    # falls in B_r(x). This is a lazy way and more efficient code could be
-    # written in c. The proportion that we seek is (p-tol, p+tol) where tol is
-    # some allowable error and p is the desired proportion
+
+#TODO: Get all the types correct
+#@check_types
+def density_determine_rad(
+        G: gl.graph,
+        x: int,
+        proportion: float,
+        r_0: float = 1.0,
+        tol: float = .02
+    ) -> float:
+    """
+    Returns the radius, 'r', required for B_r(x) to contain a fixed proportion,
+        'proportion', of the nodes in the graph. This uses the bisection method
+        and more efficient code could be written in c. Starts by picking
+        boundary points for the bisection method. The final radius will satisfy
+            -tol <= |B_r(x)| / |V(G)| - proportion <= tol
+    
+    :param G: Graph object
+    :param x: Node index
+    :param proportion: Proportion of data desired in B_r(x)
+    :param r_0: Initial radius to try for bisection method.
+    :param tol: Allowable error tolerance in proportion calculation
+    
+    :return: Radius r
+    """
     
     n = G.num_nodes
     r = r_0
     dists = G.dijkstra(bdy_set=[x], max_dist=r)
     p = np.count_nonzero(dists < r) * 1.0 / n
 
-    iterations = 1
+    iterations = 0
     a = 0
     b = 0
+    # If within some tolerance of the proportion, just return
     if p >= proportion - tol and p <= proportion + tol:
-        # If within some tolerance of the data, just return
         return p
+    #If radius too large, initialize a, b for bisection
     elif p > proportion + tol:
-        # If radius too big, initialize a, b for bisection
         a = 0
         b = r
+    #If radius too small, repeatedly increase until we can use bisection
     else:
         while p < proportion - tol:
-            # If radius too small, try to increase
             r *= 1.5
             dists = G.dijkstra(bdy_set=[x], max_dist=r)
             p = np.count_nonzero(dists < r) * 1.0 / n
@@ -72,16 +145,44 @@ def density_determine_rad(G, x, proportion, r_0=1.0, tol=.02):
             a = r
         else:
             return r
+        
         iterations += 1
-        if (iterations >= 30):
+        if (iterations >= 50):
             print("Too many iterations. Density radius did not converge")
             return r
     return r
 
-
-def coreset_dijkstras(G, rad, DEBUGGING=False, data=None, initial=[],
-        randseed=123, density_info=(False, 0, 1.0), similarity='euclidean',
-        knn_data=None):
+#@check_types
+def coreset_dijkstras(
+        G: gl.graph,
+        rad: float,
+        data: np.ndarray = None,
+        initial: list[int] = [],
+        randseed: int = 123,
+        density_info: tuple[bool, int, float] = (False, 0, 1.0),
+        similarity: str = 'euclidean',
+        knn_data: tuple[np.ndarray, np.ndarray] = None,
+        plot_steps: bool = False
+    ) -> list[int]:
+    """
+    Runs the Dijkstra's Annulus Coreset (DAC) method outlined in the paper. The
+        algorithm uses inner radius which is half of rad. When using density
+        radius, the inner radius makes half the proportion of data lie in that
+        ball.
+    
+    :param G: Graph object
+    :param rad: fixed radius to use in DAC method
+    :param data:
+    :param initial: Initial points in coreset
+    :param randseed:
+    :param density_info:
+    :param similarity:
+    :param knn_data:
+    :param plot_steps:
+    
+    :return: coreset computed from DAC
+    
+    """
     np.random.seed(randseed)
     coreset = initial.copy()
     perim = []
@@ -91,32 +192,24 @@ def coreset_dijkstras(G, rad, DEBUGGING=False, data=None, initial=[],
 
     use_density, proportion, r_0 = density_info
 
-    # Once all points have been seen, we end this
+    #Once all points have been seen, we end this
     points_seen = np.zeros(G.num_nodes)
 
     knn_val = G.weight_matrix[0].count_nonzero()
 
-    # This gives actual distances
+    #Use distances without a kernel applied
     if knn_data:
         W_dist = gl.weightmatrix.knn(data, knn_val, similarity=similarity, kernel='distance', knn_data=knn_data)
     else:
         W_dist = gl.weightmatrix.knn(data, knn_val, similarity=similarity, kernel='distance')
     G_dist = gl.graph(W_dist)
 
-    # Construct the perimeter from initial set
+    #Construct the perimeter from the initial set
     n = len(initial)
     for i in range(n):
         if use_density:
             rad_low = density_determine_rad(G_dist, initial[i], proportion / 2.0, r_0)
             rad_high = density_determine_rad(G_dist, initial[i], proportion, r_0)
-        if len(coreset) == 0:
-            tmp1 = G_dist.dijkstra(bdy_set=[initial[i]], max_dist=rad_high)
-            tmp2 = (tmp1 <= rad_high)
-            tmp3 = ((tmp1 > rad_low) * tmp2).nonzero()[0]
-            # Update perim
-            perim = list(tmp3)
-            # Update points seen
-            points_seen[tmp2] = 1
         else:
             # Calculate perimeter from new node
             tmp1 = G_dist.dijkstra(bdy_set=[initial[i]], max_dist=rad_high)
@@ -135,115 +228,154 @@ def coreset_dijkstras(G, rad, DEBUGGING=False, data=None, initial=[],
                     perim.append(x)
 
             points_seen[tmp2] = 1
+    
+    #If no initial set, the initialize first point
+    if len(coreset) == 0:
+        # Generate coreset
+        new_node = np.random.choice(G_dist.num_nodes, size=1).item()
+        coreset.append(new_node)
+        if use_density:
+            rad_low = density_determine_rad(G_dist, new_node, proportion / 2.0, r_0)
+            rad_high = density_determine_rad(G_dist, new_node, proportion, r_0)
+        # Calculate perimeter
+        tmp1 = G_dist.dijkstra(bdy_set=[new_node], max_dist=rad_high)
+        tmp2 = (tmp1 <= rad_high)
+        tmp3 = ((tmp1 > rad_low) * tmp2).nonzero()[0]
+        # Update perim
+        perim = list(tmp3)
+        # Update points seen
+        points_seen[tmp2] = 1
 
     # Generate the coreset from the remaining stuff
     iterations = 0
 
-    # while we haven't seen all points or the perimeter is empty
-    # Want this to stop when the perimeter is empty
-    # But we also want all the points to be seen
+    #Terminate if we have seen all points and the perimeter is empty
     while (np.min(points_seen) == 0 or len(perim) > 0):
-        if len(coreset) == 0:
-            # Generate coreset
-            new_node = np.random.choice(G_dist.num_nodes, size=1).item()
-            coreset.append(new_node)
-            if use_density:
-                rad_low = density_determine_rad(G_dist, new_node, proportion / 2.0, r_0)
-                rad_high = density_determine_rad(G_dist, new_node, proportion, r_0)
-            # Calculate perimeter
-            tmp1 = G_dist.dijkstra(bdy_set=[new_node], max_dist=rad_high)
-            tmp2 = (tmp1 <= rad_high)
-            tmp3 = ((tmp1 > rad_low) * tmp2).nonzero()[0]
-            # Update perim
-            perim = list(tmp3)
-            # Update points seen
-            points_seen[tmp2] = 1
-        elif len(perim) == 0:
-            # Make a random choice for a new node
-            # This situation is basically a node jump to a new region. It should essentially reduce to situation 1
+        #If perimeter is empty, jump to a new, unseen node
+        if len(perim) == 0:
             avail_nodes = (points_seen == 0).nonzero()[0]
             new_node = np.random.choice(avail_nodes, size=1).item()
             coreset.append(new_node)
             if use_density:
                 rad_low = density_determine_rad(G_dist, new_node, proportion / 2.0, r_0)
                 rad_high = density_determine_rad(G_dist, new_node, proportion, r_0)
-            # Calculate perimeter
+            #Calculate perimeter
             tmp1 = G_dist.dijkstra(bdy_set=[new_node], max_dist=rad_high)
             tmp2 = (tmp1 <= rad_high)
             tmp3 = ((tmp1 > rad_low) * tmp2).nonzero()[0]
 
-            # Need to make it so that the balls don't overlap
-            # Update perim
+            #Update perim and points seen
             perim = list(tmp3)
-            # Update points seen
             points_seen[tmp2] = 1
         else:
-            # Select a new node from the perimeter
+            #Select a new node from the perimeter
             new_node = np.random.choice(perim, size=1).item()
             coreset.append(new_node)
             if use_density:
                 rad_low = density_determine_rad(G_dist, new_node, proportion / 2.0, r_0)
                 rad_high = density_determine_rad(G_dist, new_node, proportion, r_0)
 
-            # Calculate perimeter from new node
+            #Calculate perimeter from new node
             tmp1 = G_dist.dijkstra(bdy_set=[new_node], max_dist=rad_high)
             tmp2 = (tmp1 <= rad_high)
             tmp3 = ((tmp1 > rad_low) * tmp2).nonzero()[0]
             tmp4 = (tmp1 <= rad_low).nonzero()[0]
 
-            # Get rid of points in perimeter too close to new_node
+            #Get rid of points in perimeter too close to new_node
             for x in tmp4:
                 if x in perim:
                     perim.remove(x)
 
-            # Add in points in the perimeter of new_node but unseen by old points
+            #Add in points in the perimeter of new_node but unseen by old points
             for x in tmp3:
                 if x not in perim and points_seen[x] == 0:
                     perim.append(x)
 
             points_seen[tmp2] = 1
 
-        if (DEBUGGING):
-            square_dataset = np.abs(np.max(data[:, 0]) - np.min(data[:, 0]) - 1) < .05 and np.abs(np.max(data[:, 1]) - np.min(data[:, 1]) - 1) < .05
-                
-            #The following is for the square dataset
-            if square_dataset:
-                #Save the initial dataset also
-                if len(coreset) == 1:
-                    plt.scatter(data[:, 0], data[:, 1])
-                    plt.axis('square')
-                    plt.axis('off')
-                    plt.savefig('DAC Plots/coreset0.png',bbox_inches='tight')
-                    plt.show()
-                #If not initial, do this
-                plt.scatter(data[:, 0], data[:, 1])
-                plt.scatter(data[points_seen==1, 0], data[points_seen==1, 1], c='k')
-                plt.scatter(data[coreset, 0], data[coreset, 1], c='r', s=100)
-                plt.scatter(data[perim, 0], data[perim, 1], c='y')
-                plt.axis('square')
-                plt.axis('off')
-                plt.savefig('DAC Plots/coreset' + str(len(coreset)) + '.png',bbox_inches='tight')
-            else:
-                plt.scatter(data[:, 0], data[:, 1])
-                plt.scatter(data[points_seen==1, 0], data[points_seen==1, 1], c='k')
-                plt.scatter(data[coreset, 0], data[coreset, 1], c='r')
-                plt.scatter(data[perim, 0], data[perim, 1], c='y')
-                
-            plt.show()
+        if (plot_steps):
+            _DAC_plot_fun(data, points_seen, coreset, perim)
 
         if iterations >= 1000:
             break
         iterations += 1
     return coreset
 
+#@check_types
+def _DAC_plot_fun(
+        data: np.ndarray,
+        points_seen: np.ndarray,
+        coreset: list[int],
+        perim: list[int]
+    ) -> None:
+    """
+    Function for plotting the steps of the DAC algorithm. It first checks if
+        the dataset is from a square. This indicates that it will use the
+        parameters to make nice plots for figures in the paper (eg. larger
+        red dots). If it is the square dataset, the plots are saved. The plots
+        are always displayed when this function is called.
+    
+    :param data: Raw data. Each datapoint must be in 2 dimensions
+    :param points_seen: Points which have already been seen.
+    :param coreset: Points contained in the coreset
+    :param perim: Points in the perimeter
+    
+    :return: None
+    """
+    unit_x_len = np.abs(np.max(data[:, 0]) - np.min(data[:, 0]) - 1) < .05
+    unit_y_len = np.abs(np.max(data[:, 1]) - np.min(data[:, 1]) - 1) < .05
+    square_dataset = unit_x_len and unit_y_len
+        
+    #The following is for the square dataset
+    if square_dataset:
+        #Save the initial dataset also
+        if len(coreset) == 1:
+            plt.scatter(data[:, 0], data[:, 1])
+            plt.axis('square')
+            plt.axis('off')
+            plt.savefig('DAC Plots/coreset0.png',bbox_inches='tight')
+            plt.show()
+        #If not initial, do this
+        plt.scatter(data[:, 0], data[:, 1])
+        plt.scatter(data[points_seen==1, 0], data[points_seen==1, 1], c='k')
+        plt.scatter(data[coreset, 0], data[coreset, 1], c='r', s=100)
+        plt.scatter(data[perim, 0], data[perim, 1], c='y')
+        plt.axis('square')
+        plt.axis('off')
+        plt.savefig('DAC Plots/coreset' + str(len(coreset)) + '.png',bbox_inches='tight')
+    else:
+        plt.scatter(data[:, 0], data[:, 1])
+        plt.scatter(data[points_seen==1, 0], data[points_seen==1, 1], c='k')
+        plt.scatter(data[coreset, 0], data[coreset, 1], c='r')
+        plt.scatter(data[perim, 0], data[perim, 1], c='y')
+        
+    plt.show()
+    return
 
 
 
 ################################################################################
 ## util functions for batch active learning
 
-
-def local_maxes_k_new(knn_ind, acq_array, k, top_num, thresh=0):
+#@check_types
+def local_maxes_k_new(
+        knn_ind: np.ndarray,
+        acq_array: np.ndarray,
+        k: int,                 #TODO: Got a float for this from somewhere
+        top_num: int,
+        thresh: int = 0
+    ) -> np.ndarray:
+    """
+    Function to compute the k local maxes of the acquisition function.
+    
+    :param knn_ind:
+    :param acq_array:
+    :param k:
+    :param top_num:
+    :param thresh:
+    
+    :return:
+    """
     # Look at the k nearest neighbors
     # If weights(v) >= weights(u) for all u in neighbors, then v is a local max
     local_maxes = np.array([])
@@ -271,7 +403,13 @@ def local_maxes_k_new(knn_ind, acq_array, k, top_num, thresh=0):
 
 ################################################################################
 ## functions of k-means batch active learning
-def random_sample_val(val, sample_num, random_state=None):
+
+#@check_types
+def random_sample_val(
+        val: np.ndarray,
+        sample_num: int,
+        random_state = None     #TODO: This
+    ) -> np.ndarray:
     if random_state is None:
         random_state = 0
     random_state = check_random_state(random_state)
@@ -290,7 +428,8 @@ def random_sample_val(val, sample_num, random_state=None):
     return sampled_inds
 
 ### functions about K-means betch active learning
-def dist_angle(X, y, epsilon=1e-8):
+@check_types
+def dist_angle(X: np.ndarray, y: np.ndarray, epsilon: float = 1e-8):
     # y is the current guess for the center
     cos_sim = (X @ y - epsilon) / np.maximum(np.linalg.norm(X, axis=1) * np.linalg.norm(y), epsilon)
     # This epsilon stuff can give out of bounds
@@ -298,27 +437,10 @@ def dist_angle(X, y, epsilon=1e-8):
         cos_sim = np.maximum(np.minimum(cos_sim, 1), -1)
     return np.arccos(cos_sim)
 
-
-def diff_x_angle(X, y, P, epsilon=1e-8):
-    theta = dist_angle(X, y)
-    y_norm = np.linalg.norm(y)
-    y_coeff = np.sum(P * theta / np.tan(theta)) / (y_norm ** 2)
-    X_coeffs = (P * theta / np.sin(theta)) / y_norm
-    X_normed = X / np.linalg.norm(X, axis=1).reshape((-1, 1))
-
-    return (y_coeff * y - X_normed.T @ X_coeffs) / len(X)
-
-    # return - y / np.sqrt(1 - np.inner(x, y) ** 2 + epsilon) * np.arccos( np.inner(x, y) - epsilon)
-
-
-def dist_euclidean(X, y):
+@check_types
+def dist_euclidean(X: np.ndarray, y: np.ndarray):
+    """Computes distance from columns of X to y"""
     return np.linalg.norm(X - y.reshape((1, -1)), axis=1)
-
-
-def diff_x_euclidean(X, y, P, epsilon=1e-8):
-    # P here is the weight matrix we design
-    # We just pass in the column corresponding to y
-    return (np.sum(P) * y - X.T @ P) / len(X)
 
 
 
@@ -326,11 +448,38 @@ def diff_x_euclidean(X, y, P, epsilon=1e-8):
 ################################################################################
 
 ## implement batch active learning function
-def coreset_run_experiment(X, labels, W, coreset, num_iter=1, method='Laplace',
-        display=False, use_prior=False, al_mtd='local_max', debug=False,
-        acq_fun='uc', knn_data=None, mtd_para=None, savefig=False,
-        savefig_folder='../BAL_figures', batchsize=BATCH_SIZE, dist_metric='euclidean',
-        knn_size=50, q=1, thresholding=0, randseed=0):
+#@check_types
+def coreset_run_experiment(
+        X: np.ndarray,
+        labels: np.ndarray,
+        W,                      #TODO: scipy.sparse._csr.csr_matrix
+        coreset: list[int],
+        num_iter: int = 1,
+        method: str = 'Laplace',
+        display: bool = False,
+        use_prior: bool = False,
+        al_mtd: str = 'local_max',
+        display_all_times: bool = False,
+        acq_fun: str = 'uc',
+        knn_data: tuple = None,
+        mtd_para = None,        #'NoneType' could also be tuple i think
+        savefig: bool = False,
+        savefig_folder: str = '../BAL_figures',
+        batchsize: int = BATCH_SIZE,
+        dist_metric: str = 'euclidean',
+        knn_size: int = 50,
+        q: int = 1,
+        thresholding: int = 0,
+        randseed: int = 0
+    ) -> tuple[np.ndarray, list[int], np.ndarray, float]: #TODO: This isn't the only output format
+    """
+    Function to run batch active learning
+    
+    **LIST ALL PARAMS
+    
+    :return:
+    
+    """
 
     '''
         al_mtd: 'local_max', 'global_max', 'rs_kmeans', 'gd_kmeans', 'acq_sample', 'greedy_batch', 'particle', 'random', 'topn_max'
@@ -378,7 +527,7 @@ def coreset_run_experiment(X, labels, W, coreset, num_iter=1, method='Laplace',
     
     # perform classification with GSSL classifier
     u = model.fit(act.current_labeled_set, act.current_labels)
-    if debug:
+    if display_all_times:
         t_al_e = timeit.default_timer()
         print('Active learning setup time = ', t_al_e - t_al_s)
 
@@ -405,7 +554,7 @@ def coreset_run_experiment(X, labels, W, coreset, num_iter=1, method='Laplace',
 
     for iteration in range(num_iter):  # todo get rid of printing times
 
-        if debug:
+        if display_all_times:
             t_iter_s = timeit.default_timer()
 
         act.candidate_inds = np.setdiff1d(act.training_set, act.current_labeled_set)
@@ -417,13 +566,9 @@ def coreset_run_experiment(X, labels, W, coreset, num_iter=1, method='Laplace',
         modded_acq_vals = np.zeros(len(X))
         modded_acq_vals[act.candidate_inds] = acq_vals
         
-        #TODO: REMOVE THIS
-        #print("Candidate index size", len(act.candidate_inds))
-
         if al_mtd == 'local_max':
             if knn_data:
                 batch = local_maxes_k_new(knn_ind, modded_acq_vals, k, batchsize, thresh)
-                # batch = local_maxes_k(knn_ind, modded_acq_vals, k, top_cut, thresh)
         elif al_mtd == 'global_max':
             batch = act.candidate_inds[np.argmax(acq_vals)]
         elif al_mtd == 'acq_sample':
@@ -438,7 +583,7 @@ def coreset_run_experiment(X, labels, W, coreset, num_iter=1, method='Laplace',
             max_acq_val = np.max(acq_vals)
             batch = batch[modded_acq_vals[batch] >= (thresholding * max_acq_val)]
 
-        if debug:
+        if display_all_times:
             t_localmax_e = timeit.default_timer()
             print("Batch Active Learning time = ", t_localmax_e - t_iter_s)
             print("Batch inds:", batch)
@@ -459,7 +604,7 @@ def coreset_run_experiment(X, labels, W, coreset, num_iter=1, method='Laplace',
         u = model.fit(act.current_labeled_set, act.current_labels)
         current_label_guesses = model.predict()
         acc = gl.ssl.ssl_accuracy(current_label_guesses, labels, len(act.current_labeled_set))
-        if debug:
+        if display_all_times:
             t_modelfit_e = timeit.default_timer()
             print('Model fit time = ', t_modelfit_e - t_localmax_e)
 
@@ -479,7 +624,7 @@ def coreset_run_experiment(X, labels, W, coreset, num_iter=1, method='Laplace',
                 plt.savefig(os.path.join(savefig_folder, 'bal_acq_vals_a' + str(iteration) + '.png'),bbox_inches='tight')
             plt.show()
 
-        if debug:
+        if display_all_times:
             t_iter_e = timeit.default_timer()
             print("Iteration:", iteration, "Iteration time = ", t_iter_e - t_iter_s)
     
@@ -510,6 +655,10 @@ def perform_al_experiment(dataset_chosen, embedding_mode='just_transfer',
         acq_fun='uc', knn_data=None, mtd_para=None, savefig=False,
         savefig_folder='../BAL_figures', batchsize=BATCH_SIZE, dist_metric='euclidean',
         knn_size=50, q=1, thresholding=0, randseed=0, experiment_time=10):
+    """
+    FUNCTION SIGNATURE HERE!!
+    
+    """
     
     highest_accuracy_list = [0] * len(acq_fun_list)
     average_accuracy_list = [0] * len(acq_fun_list)
@@ -604,7 +753,7 @@ def perform_al_experiment(dataset_chosen, embedding_mode='just_transfer',
 
         #Generate Coreset
         #Use the percent radius because it should be more robust across datasets
-        coreset = coreset_dijkstras(G, rad = .2, DEBUGGING=False, data = X, initial=initial, 
+        coreset = coreset_dijkstras(G, rad = .2, data = X, initial=initial,
                                         density_info = (True, density_radius_param, 1), knn_data=knn_data)
         print("Coreset Size = {}\t Percent of data = {}%".format(len(coreset), round(100 * len(coreset) / len(X), 2)))
         print("Coreset = ", coreset)
@@ -640,7 +789,7 @@ def perform_al_experiment(dataset_chosen, embedding_mode='just_transfer',
             
 
             _, list_num_labels, list_acc = coreset_run_experiment(X, labels, W, coreset, num_iter=num_iter, method=method,
-                                    display=False, use_prior=False, al_mtd=al_mtd, debug=False,
+                                    display=False, use_prior=False, al_mtd=al_mtd, display_all_times=False,
                                     acq_fun=acq_fun, knn_data=knn_data, mtd_para=None,
                                     savefig=False, savefig_folder='../BAL_figures', batchsize=batchsize,
                                     dist_metric='angular', q=10, thresholding=0, randseed=0)
@@ -677,15 +826,15 @@ def perform_al_experiment(dataset_chosen, embedding_mode='just_transfer',
 ################################################################################
 ## toy datasets
 def gen_checkerboard_3(num_samples = 500, randseed = 123):
-      np.random.seed(randseed)
-      X = np.random.rand(num_samples, 2)
-      labels = np.mod(np.floor(X[:, 0] * 3) + np.floor(X[:, 1] * 3), 3).astype(np.int64)
-
-      return X, labels
+    """Function to generate the toy dataset: checkerboard 3"""
+    np.random.seed(randseed)
+    X = np.random.rand(num_samples, 2)
+    labels = np.mod(np.floor(X[:, 0] * 3) + np.floor(X[:, 1] * 3), 3).astype(np.int64)
+    return X, labels
 
 def gen_stripe_3(num_samples = 500, width = 1/3, randseed = 123):
-      np.random.seed(randseed)
-      X = np.random.rand(num_samples, 2)
-      labels = np.mod(np.floor(X[:, 0] / width + X[:, 1] / width), 3).astype(np.int64)
-
-      return X, labels
+    """Function to generate the toy dataset: stripe 3"""
+    np.random.seed(randseed)
+    X = np.random.rand(num_samples, 2)
+    labels = np.mod(np.floor(X[:, 0] / width + X[:, 1] / width), 3).astype(np.int64)
+    return X, labels

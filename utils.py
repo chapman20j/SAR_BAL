@@ -70,8 +70,17 @@ USE_HARDWARE_ACCELERATION = False
 #Convenient functions for loading data for the experiments
 #These are like the default embedding functions (with proper networks, etc.)
 
-
-def CNNVAE(dataset, knn_num=50, include_knn_data=True):
+#TODO: Check the types on this
+def CNNVAE(
+        dataset: str,
+        knn_num: int = KNN_NUM,
+        include_knn_data: bool = True
+    ) -> tuple[np.ndarray, np.ndarray]: #TODO: Make new output type
+    """
+    Embeds the chosen dataset using a trained CNNVAE.
+    
+    param dataset:
+    """
     assert dataset in AVAILABLE_SAR_DATASETS, "Invalid Dataset"
     
     #Load Dataset
@@ -103,7 +112,12 @@ def CNNVAE(dataset, knn_num=50, include_knn_data=True):
         return X, labels
 
 
-def zero_shot_TL(dataset, knn_num=50, data_augmentation=True, include_knn_data=True):
+def zero_shot_TL(
+        dataset: str,
+        knn_num: int = KNN_NUM,
+        data_augmentation: bool = True,
+        include_knn_data: bool = True
+    ) -> tuple[np.ndarray, np.ndarray]: #TODO: Make new output type
     assert dataset in AVAILABLE_SAR_DATASETS, "Invalid Dataset"
     
     if dataset == 'mstar':
@@ -122,7 +136,14 @@ def zero_shot_TL(dataset, knn_num=50, data_augmentation=True, include_knn_data=T
 
 #TODO: This isn't done yet
 #I need to set this up so it is nice
-def fine_tuned_TL(dataset, knn_num=50, num_epochs=TL_EPOCHS, network=None, data_augmentation=True, include_knn_data=True):
+def fine_tuned_TL(
+        dataset: str,
+        knn_num: int = KNN_NUM,
+        num_epochs: int = TL_EPOCHS,
+        network = None,                 #TODO: Here
+        data_augmentation: bool = True,
+        include_knn_data: bool = True
+    ) -> tuple[np.ndarray, np.ndarray]: #TODO: Make new output type
     assert dataset in AVAILABLE_SAR_DATASETS, "Invalid Dataset"
     
     X, labels = load_dataset(dataset, return_torch=False, concatenate=True)
@@ -145,7 +166,12 @@ def fine_tuned_TL(dataset, knn_num=50, num_epochs=TL_EPOCHS, network=None, data_
         return X, labels
 
 
-def load_dataset(dataset, return_torch=True, shuffle_train_set=False, concatenate=False):
+def load_dataset(
+        dataset: str,
+        return_torch: bool = True,
+        shuffle_train_set: bool = False,
+        concatenate: bool = False
+    ):                              #TODO: Make new output data type
     if dataset == 'open_sar_ship':
         data_train = np.load('data/OpenSARShip/SarTrainImages.npz')['arr_0']
         target_train = np.load('data/OpenSARShip/SarTrainLabels.npy')
@@ -208,7 +234,10 @@ def load_dataset(dataset, return_torch=True, shuffle_train_set=False, concatenat
 
 #TODO: Want to make sure to use mps here
 #TODO: It wasn't faster. Check this again
-def _apply_data_augmentation(data, reshape=True):
+def _apply_data_augmentation(
+        data: torch.Tensor,
+        reshape: bool = True
+    ) -> torch.Tensor:
     #print(data.shape)
     device = torch.device(_determine_hardware())
     t1 = transforms.GaussianBlur(kernel_size=(1,1), sigma=(1, 1))
@@ -234,7 +263,7 @@ def _apply_data_augmentation(data, reshape=True):
     return data
     
 #MARK: Used in the encode_pretrained
-def _determine_feature_layer(model_type):
+def _determine_feature_layer(model_type: str) -> str:
     feature_layer = "flatten"
     if model_type == "ShuffleNet":
         feature_layer = "mean"
@@ -242,7 +271,7 @@ def _determine_feature_layer(model_type):
         feature_layer == "dropout"
     return feature_layer
 
-def _determine_hardware():
+def _determine_hardware() -> str:
     if USE_HARDWARE_ACCELERATION and torch.cuda.is_available():
         return 'cuda'
     elif USE_HARDWARE_ACCELERATION and torch.has_mps:
@@ -270,7 +299,17 @@ class MyDataset(Dataset):
 
 #Helper function for transfer learning
 #Fine tune the pretrained model
-def train_model(model, criterion, optimizer, scheduler, device, dataloaders, dataset_sizes, num_epochs=25):
+#TODO: Add types here
+def train_model(
+        model,
+        criterion,
+        optimizer,
+        scheduler,
+        device,
+        dataloaders,
+        dataset_sizes,
+        num_epochs=25
+    ):
     since = time.time()
 
     best_model_wts = copy.deepcopy(model.state_dict())
@@ -337,7 +376,8 @@ def train_model(model, criterion, optimizer, scheduler, device, dataloaders, dat
     model.load_state_dict(best_model_wts)
     return model
 
-def _construct_TL_network(dataset, model_type):
+#TODO: Check this is correct output type
+def _construct_TL_network(dataset: str, model_type: str) -> nn.Module:
     #The most optimized choice of CNNs
     if model_type is None:
         if dataset == 'open_sar_ship':
@@ -386,6 +426,7 @@ def _construct_TL_network(dataset, model_type):
                 model_ft.fc = nn.Linear(num_ftrs, 5)
     return model_ft
 
+#TODO: types
 def NormalizeData(data):
     '''Normalizes data to range [0,1]
 
@@ -405,7 +446,7 @@ def NormalizeData(data):
         assert False, "Invalid type for NormalizeData"
     return norm_data
 
-def _get_knn_data(dataset):
+def _get_knn_data(dataset: str) -> tuple[np.ndarray, np.ndarray]:
     knn_ind = np.load("knn_data/" + dataset + "_knn_ind.npy")
     knn_dist = np.load("knn_data/" + dataset + "_knn_dist.npy")
     return knn_ind, knn_dist
@@ -414,7 +455,12 @@ def _get_knn_data(dataset):
 ## Encoding/Transfer Learning Functions
 
 #This was efficient
-def encode_dataset(dataset, model_path, batch_size = ENCODING_BATCH_SIZE):
+#TODO: Types
+def encode_dataset(
+        dataset,
+        model_path,
+        batch_size = ENCODING_BATCH_SIZE
+    ):
     #Decide which device to use
     device = torch.device(_determine_hardware())
 
@@ -435,8 +481,15 @@ def encode_dataset(dataset, model_path, batch_size = ENCODING_BATCH_SIZE):
 
     return encoded_data
 
-
-def encode_pretrained(dataset, model_type, batch_size = ENCODING_BATCH_SIZE, device_name='mps', balanced = False, transformed = False):
+#TODO: types
+def encode_pretrained(
+        dataset,
+        model_type,
+        batch_size = ENCODING_BATCH_SIZE,
+        device_name='mps',
+        balanced = False,
+        transformed = False
+    ):
     #Decide which device to use
     #device = torch.device(_determine_hardware())
 
@@ -483,8 +536,16 @@ def encode_pretrained(dataset, model_type, batch_size = ENCODING_BATCH_SIZE, dev
 
     return encoded_data, labels
 
-
-def encode_transfer_learning(dataset, model_type = None, epochs = 15, transfer_batch_size = 64, batch_size = ENCODING_BATCH_SIZE, data_info=None, transformed = False):
+#TODO: types
+def encode_transfer_learning(
+        dataset,
+        model_type = None,
+        epochs = 15,
+        transfer_batch_size = 64,
+        batch_size = ENCODING_BATCH_SIZE,
+        data_info=None,
+        transformed = False
+    ):
     #Decide which device to use
     device = torch.device(_determine_hardware())
     
@@ -596,8 +657,9 @@ def encode_transfer_learning(dataset, model_type = None, epochs = 15, transfer_b
 ### MSTAR Helper Functions
 ##All code below is from MSTAR Github
 
+#TODO: Make these private. Don't need types
 
-def load_MSTAR(root_dir = './data/MSTAR'):
+def load_MSTAR(root_dir= './data/MSTAR'):
     """Loads MSTAR Data
 
     Parameters
