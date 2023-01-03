@@ -6,7 +6,7 @@ for neural networks also. The available embeddings are:
     CNNVAE:         uses a pretrained cnnvae to embed the data
     zero_shot_tl:   uses zero shot transfer learning
     fine_tuned_tl:  uses fine tuned transfer learning
-The beginning of the code also contains constant which are used throughout the project. 
+The beginning of the code also contains constant which are used throughout the project.
 """
 import os
 import math
@@ -29,21 +29,24 @@ from torchvision import transforms
 
 import graphlearning as gl
 
-
 ################################################################################
 ## Default Parameters
 
 # TODO: CHECK THESE ARE ORIGINALS
-KNN_NUM = 50
-TL_EPOCHS = 10
-ENCODING_BATCH_SIZE = 1000
-TL_BATCH_SIZE = 64
+KNN_NUM: int = 50
+TL_EPOCHS: int = 10
+ENCODING_BATCH_SIZE: int = 1000
+TL_BATCH_SIZE: int = 64
 
-AVAILABLE_SAR_DATASETS = ["mstar", "open_sar_ship", "fusar"]
-AVAILABLE_EMBEDDINGS = ["cnnvae", "zero_shot_tl", "fine_tuned_tl"]
-SAR_DATASET_SIZE_DICT = {"mstar": 6874, "open_sar_ship": 2296, "fusar": 4856}
+AVAILABLE_SAR_DATASETS: list[str] = ["mstar", "open_sar_ship", "fusar"]
+AVAILABLE_EMBEDDINGS: list[str] = ["cnnvae", "zero_shot_tl", "fine_tuned_tl"]
+SAR_DATASET_SIZE_DICT: dict[str, int] = {
+    "mstar": 6874,
+    "open_sar_ship": 2296,
+    "fusar": 4856,
+}
 
-PYTORCH_NEURAL_NETWORKS = [
+PYTORCH_NEURAL_NETWORKS: list[str] = [
     "ResNet",
     "ShuffleNet",
     "AlexNet",
@@ -54,7 +57,7 @@ PYTORCH_NEURAL_NETWORKS = [
     "Wide ResNet",
 ]
 
-PYTORCH_NEURAL_NETWORKS_DICT = {
+PYTORCH_NEURAL_NETWORKS_DICT: dict[str, str] = {
     "ResNet": "resnet18",
     "ShuffleNet": "shufflenet_v2_x0_5",
     "AlexNet": "alexnet",
@@ -65,13 +68,13 @@ PYTORCH_NEURAL_NETWORKS_DICT = {
     "Wide ResNet": "wide_resnet50_2",
 }
 
-DEFAULT_NEURAL_NETWORKS_DICT = {
+DEFAULT_NEURAL_NETWORKS_DICT: dict[str, str] = {
     "mstar": "ResNet",
     "open_sar_ship": "AlexNet",
     "fusar": "ShuffleNet",
 }
 
-USE_HARDWARE_ACCELERATION = False
+USE_HARDWARE_ACCELERATION: bool = False
 
 
 ################################################################################
@@ -103,7 +106,7 @@ def CNNVAE(
     assert dataset in AVAILABLE_SAR_DATASETS, "Invalid Dataset"
 
     # Load Dataset
-    X, labels = load_dataset(dataset, return_torch=False, concatenate=True)
+    X, labels = load_dataset(dataset, return_torch=False)
 
     # Determine CNNVAE model
     if dataset == "mstar":
@@ -144,7 +147,7 @@ def zero_shot_TL(
     """
     assert dataset in AVAILABLE_SAR_DATASETS, "Invalid Dataset"
 
-    _, labels = load_dataset(dataset, return_torch=False, concatenate=True)
+    _, labels = load_dataset(dataset, return_torch=False)
 
     X = encode_pretrained(
         dataset,
@@ -176,7 +179,7 @@ def fine_tuned_TL(
     """
     assert dataset in AVAILABLE_SAR_DATASETS, "Invalid Dataset"
 
-    _, labels = load_dataset(dataset, return_torch=False, concatenate=True)
+    _, labels = load_dataset(dataset, return_torch=False)
 
     # If network is None, we use the defaults. This functionality is in
     #   the encode_transfer_learning function
@@ -203,9 +206,7 @@ def fine_tuned_TL(
 def load_dataset(
     dataset: str,
     return_torch: bool,
-    concatenate: bool,
-    shuffle_train_set: bool = False,
-) -> DatasetType:
+) -> tuple[ArrayType, ArrayType]:
     """
     Docstring
     """
@@ -236,29 +237,50 @@ def load_dataset(
     else:
         assert False, "Code not implemented for this dataset"
 
+    if dataset != "mstar":
+        data = np.vstack((data_train, data_test))
+        target = np.hstack((target_train, target_test))
+
+    if return_torch:
+        data = torch.from_numpy(data).float()
+        target = torch.from_numpy(target).long()
+
+    return data, target
+
+
+# TODO: Need to do with the gl.trainsets.generate()
+def load_dataset_fine_tuned_tl(
+    dataset: str,
+    return_torch: bool,
+    shuffle_train_set: bool = False,
+) -> tuple[ArrayType, ArrayType, ArrayType, ArrayType]:
+    # Load dataset
+    data, target = load_dataset(dataset, return_torch=False)
+
+    # Get train-test split
+    dataset_size = SAR_DATASET_SIZE_DICT[dataset]
+    tl_num = round(dataset_size * 0.05)
+    train_ind = np.random.choice(dataset_size, size=tl_num, replace=False)
+    test_ind = np.setdiff1d(np.arange(dataset_size), train_ind)
+
+    data_train = data[train_ind, ...]
+    data_test = data[test_ind, ...]
+    target_train = target[train_ind]
+    target_test = target[test_ind]
+
+    # Potentially shuffle the training set
     if shuffle_train_set:
         P = np.random.permutation(data_train.shape[0])
         data_train = data_train[P, :, :, :]
         target_train = target_train[P]
 
-    if concatenate and dataset != "mstar":
-        data = np.vstack((data_train, data_test))
-        target = np.hstack((target_train, target_test))
-
     if return_torch:
-        if concatenate:
-            data = torch.from_numpy(data).float()
-            target = torch.from_numpy(target).long()
-        else:
-            data_train = torch.from_numpy(data_train).float()
-            target_train = torch.from_numpy(target_train).long()
-            data_test = torch.from_numpy(data_test).float()
-            target_test = torch.from_numpy(target_test).long()
+        data_train = torch.from_numpy(data_train).float()
+        target_train = torch.from_numpy(target_train).long()
+        data_test = torch.from_numpy(data_test).float()
+        target_test = torch.from_numpy(target_test).long()
 
-    if concatenate:
-        return data, target
-    else:
-        return data_train, target_train, data_test, target_test
+    return data_train, target_train, data_test, target_test
 
 
 ################################################################################
@@ -342,6 +364,7 @@ class MyDataset(Dataset):
 
 
 # TODO: Add types here
+# TODO: Make this print less
 def train_model(
     model,
     criterion,
@@ -351,20 +374,41 @@ def train_model(
     dataloaders,
     dataset_sizes,
     num_epochs=25,
+    verbose: int = 1,
 ):
     """
     Helper function for transfer learning. Fine tunes the pretrained model.
 
     FINISH THIS
+
+    :param model:
+    :param criterion:
+    :param optimizer:
+    :param scheduler:
+    :param device:
+    :param dataloaders:
+    :param dataset_sizes:
+    :param num_epochs:
+    :param verbose: determines the amount of printing done
+        0 gives no printing
+        1 gives just the epoch
+        2 gives full output
+
+    :return:
     """
     since = time.time()
+    assert verbose in [0, 1, 2]
 
     best_model_wts = copy.deepcopy(model.state_dict())
     best_acc = 0.0
 
+    if verbose >= 1:
+        print(f"Training model for {num_epochs} epochs")
+
     for epoch in range(num_epochs):
-        print("Epoch {}/{}".format(epoch + 1, num_epochs))
-        print("-" * 10)
+        if verbose == 2:
+            print("Epoch {}/{}".format(epoch + 1, num_epochs))
+            print("-" * 10)
 
         # Each epoch has a training and validation phase
         for phase in ["train", "val"]:
@@ -406,22 +450,27 @@ def train_model(
             epoch_loss = running_loss / dataset_sizes[phase]
             epoch_acc = running_corrects.float() / dataset_sizes[phase]
 
-            print("{} Loss: {:.4f} Acc: {:.4f}".format(phase, epoch_loss, epoch_acc))
+            if verbose == 2:
+                print(
+                    "{} Loss: {:.4f} Acc: {:.4f}".format(phase, epoch_loss, epoch_acc)
+                )
 
             # deep copy the model
             if phase == "val" and epoch_acc > best_acc:
                 best_acc = epoch_acc
                 best_model_wts = copy.deepcopy(model.state_dict())
-
-        print()
+        if verbose == 2:
+            print()
 
     time_elapsed = time.time() - since
-    print(
-        "Training complete in {:.0f}m {:.0f}s".format(
-            time_elapsed // 60, time_elapsed % 60
+
+    if verbose >= 1:
+        print(
+            "Training complete in {:.0f}m {:.0f}s".format(
+                time_elapsed // 60, time_elapsed % 60
+            )
         )
-    )
-    print("Best val Acc: {:4f}".format(best_acc))
+        print("Best val Acc: {:4f}".format(best_acc))
 
     # load best model weights
     model.load_state_dict(best_model_wts)
@@ -521,7 +570,7 @@ def encode_dataset(
     device = torch.device(_determine_hardware())
 
     # Load data
-    data, _ = load_dataset(dataset, return_torch=True, concatenate=True)
+    data, _ = load_dataset(dataset, return_torch=True)
 
     # Load model
     model = torch.load(model_path, map_location=device)
@@ -553,7 +602,7 @@ def encode_pretrained(
     device = torch.device("cpu")
 
     # Load data
-    data, labels = load_dataset(dataset, return_torch=True, concatenate=True)
+    data, labels = load_dataset(dataset, return_torch=True)
     # data = data.to(device)
 
     # Apply data augmentation
@@ -620,9 +669,12 @@ def encode_transfer_learning(
     if (model_type is None) or (model_type in PYTORCH_NEURAL_NETWORKS):
         # Load training and testing data
         if data_info is None:
-            data_train, label_train, data_test, label_test = load_dataset(
-                dataset, return_torch=True, concatenate=False
-            )
+            (
+                data_train,
+                label_train,
+                data_test,
+                label_test,
+            ) = load_dataset_fine_tuned_tl(dataset, return_torch=True)
         else:
             data_train, label_train, data_test, label_test = data_info
 
@@ -701,9 +753,7 @@ def encode_transfer_learning(
             num_epochs=epochs,
         )
 
-        data, _ = load_dataset(
-            dataset, return_torch=True, shuffle_train_set=False, concatenate=True
-        )
+        data, _ = load_dataset(dataset, return_torch=True)
 
         if transformed:
             # Modify the data
@@ -732,7 +782,7 @@ def encode_transfer_learning(
             encoded_data_dict = feature_extractor(data)
             encoded_data = encoded_data_dict[feature_layer].detach().cpu().numpy()
     else:
-        data, _ = load_dataset(dataset, return_torch=True, concatenate=True)
+        data, _ = load_dataset(dataset, return_torch=True)
         model = torch.load(model_type, map_location=device)
         model.eval()
         encoded_data = None
@@ -909,7 +959,8 @@ def _rotate_images(
             img = data_rotated[index, 0, :, :]
             img_thresholded = (img > threshold).type(torch.float)
 
-        # very rarely thresholding results in too sparse of an image because the image is essentailly blank to begin with
+        # very rarely thresholding results in too sparse of an image because
+        # the image is essentailly blank to begin with
         if torch.sum(img_thresholded) <= 1:
             continue
 

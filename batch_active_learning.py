@@ -30,22 +30,22 @@ import utils
 # TODO: Function comments
 # Please include the exact python type
 # Complex functions. Refer to density_determine_rad for an example
-"""
-Function description
-
-:param p1: description
-    additional details if necessary
-:param p2: description
-...
-:param pn: description
-
-:return:
-    variable 1: description
-    variable 2: description
-"""
+# """
+# Function description
+#
+# :param p1: description
+#     additional details if necessary
+# :param p2: description
+# ...
+# :param pn: description
+#
+# :return:
+#     variable 1: description
+#     variable 2: description
+# """
 
 # Simple functions.
-"""Quick function description"""
+# """Quick function description"""
 
 
 ########
@@ -86,13 +86,21 @@ def check_types(fun):
 DENSITY_RADIUS: float = 0.2
 BATCH_SIZE: int = 15
 
-ACQUISITION_FUNCTIONS = ["uc", "vopt", "mc", "mcvopt"]
-AL_METHODS = ["local_max", "random", "topn_max", "acq_sample", "global_max"]
+ACQUISITION_FUNCTIONS: list[str] = ["uc", "vopt", "mc", "mcvopt"]
+AL_METHODS: list[str] = ["local_max", "random", "topn_max", "acq_sample", "global_max"]
 AL_METHOD_NAMES = ["LocalMax", "Random", "TopMax", "Acq_sample", "Sequential"]
 
 # TODO: Check that these are originals
-MAX_NEW_SAMPLES_DICT = {"mstar": 481, "open_sar_ship": 690, "fusar": 3060}
-FINE_TUNED_MAX_NEW_SAMPLES_DICT = {"mstar": 137, "open_sar_ship": 574, "fusar": 2816}
+MAX_NEW_SAMPLES_DICT: dict[str, int] = {
+    "mstar": 481,
+    "open_sar_ship": 690,
+    "fusar": 3060,
+}
+FINE_TUNED_MAX_NEW_SAMPLES_DICT: dict[str, int] = {
+    "mstar": 137,
+    "open_sar_ship": 574,
+    "fusar": 2816,
+}
 
 BALOutputType = Union[
     tuple[np.ndarray, list[int], np.ndarray, float],
@@ -104,8 +112,8 @@ BALOutputType = Union[
 
 # @check_types
 def density_determine_rad(
-    G: gl.graph,
-    x: int,
+    graph: gl.graph,
+    node: int,
     proportion: float,
     r_0: float = 1.0,
     tol: float = 0.02,
@@ -126,47 +134,47 @@ def density_determine_rad(
     :return: Radius r
     """
 
-    n = G.num_nodes
-    r = r_0
-    dists = G.dijkstra(bdy_set=[x], max_dist=r)
-    p = np.count_nonzero(dists < r) * 1.0 / n
+    num_nodes = graph.num_nodes
+    rad = r_0
+    dists = graph.dijkstra(bdy_set=[node], max_dist=rad)
+    p_current = np.count_nonzero(dists < rad) * 1.0 / num_nodes
 
     iterations: int = 0
-    a = 0.0
-    b = 0.0
+    r_low = 0.0
+    r_high = 0.0
     # If within some tolerance of the proportion, just return
-    if p >= proportion - tol and p <= proportion + tol:
-        return p
+    if p_current >= proportion - tol and p_current <= proportion + tol:
+        return p_current
     # If radius too large, initialize a, b for bisection
-    elif p > proportion + tol:
-        a = 0
-        b = r
+    elif p_current > proportion + tol:
+        r_low = 0
+        r_high = rad
     # If radius too small, repeatedly increase until we can use bisection
     else:
-        while p < proportion - tol:
-            r *= 1.5
-            dists = G.dijkstra(bdy_set=[x], max_dist=r)
-            p = np.count_nonzero(dists < r) * 1.0 / n
-        a = 0.66 * r
-        b = r
+        while p_current < proportion - tol:
+            rad *= 1.5
+            dists = graph.dijkstra(bdy_set=[node], max_dist=rad)
+            p_current = np.count_nonzero(dists < rad) * 1.0 / num_nodes
+        r_low = 0.66 * rad
+        r_high = rad
 
     # Do bisection method to get answer
-    while p < proportion - tol or p > proportion + tol:
-        r = (a + b) / 2.0
-        p = np.count_nonzero(dists < r) * 1.0 / n
+    while p_current < proportion - tol or p_current > proportion + tol:
+        rad = (r_low + r_high) / 2.0
+        p_current = np.count_nonzero(dists < rad) * 1.0 / num_nodes
 
-        if p > proportion + tol:
-            b = r
-        elif p < proportion - tol:
-            a = r
+        if p_current > proportion + tol:
+            r_high = rad
+        elif p_current < proportion - tol:
+            r_low = rad
         else:
-            return r
+            return rad
 
         iterations += 1
         if iterations >= 50:
             print("Too many iterations. Density radius did not converge")
-            return r
-    return r
+            return rad
+    return rad
 
 
 # @check_types
@@ -175,7 +183,6 @@ def coreset_dijkstras(
     rad: float,
     data: Optional[np.ndarray] = None,
     initial: Optional[list[int]] = None,
-    randseed: int = 123,
     density_info: tuple[bool, float, float] = (False, DENSITY_RADIUS, 1.0),
     similarity: str = "euclidean",
     knn_data: Optional[tuple[np.ndarray, np.ndarray]] = None,
@@ -191,7 +198,6 @@ def coreset_dijkstras(
     :param rad: fixed radius to use in DAC method
     :param data:
     :param initial: Initial points in coreset
-    :param randseed:
     :param density_info:
     :param similarity:
     :param knn_data:
@@ -200,7 +206,6 @@ def coreset_dijkstras(
     :return: coreset computed from DAC
 
     """
-    np.random.seed(randseed)
 
     perim: list[int] = []
     if initial is None:
@@ -219,24 +224,29 @@ def coreset_dijkstras(
 
     # Use distances without a kernel applied
     if knn_data:
-        W_dist = gl.weightmatrix.knn(
+        w_dist = gl.weightmatrix.knn(
             data, knn_val, similarity=similarity, kernel="distance", knn_data=knn_data
         )
     else:
-        W_dist = gl.weightmatrix.knn(
+        w_dist = gl.weightmatrix.knn(
             data, knn_val, similarity=similarity, kernel="distance"
         )
-    G_dist = gl.graph(W_dist)
+    # Construct graph from raw distances
+    graph_raw_dist = gl.graph(w_dist)
 
     # Construct the perimeter from the initial set
     n = len(initial)
     for i in range(n):
         if use_density:
-            rad_low = density_determine_rad(G_dist, initial[i], proportion / 2.0, r_0)
-            rad_high = density_determine_rad(G_dist, initial[i], proportion, r_0)
+            rad_low = density_determine_rad(
+                graph_raw_dist, initial[i], proportion / 2.0, r_0
+            )
+            rad_high = density_determine_rad(
+                graph_raw_dist, initial[i], proportion, r_0
+            )
         else:
             # Calculate perimeter from new node
-            tmp1 = G_dist.dijkstra(bdy_set=[initial[i]], max_dist=rad_high)
+            tmp1 = graph_raw_dist.dijkstra(bdy_set=[initial[i]], max_dist=rad_high)
             tmp2 = tmp1 <= rad_high
             tmp3 = ((tmp1 > rad_low) * tmp2).nonzero()[0]
             tmp4 = (tmp1 <= rad_low).nonzero()[0]
@@ -256,13 +266,15 @@ def coreset_dijkstras(
     # If no initial set, the initialize first point
     if len(coreset) == 0:
         # Generate coreset
-        new_node = np.random.choice(G_dist.num_nodes, size=1).item()
+        new_node = np.random.choice(graph_raw_dist.num_nodes, size=1).item()
         coreset.append(new_node)
         if use_density:
-            rad_low = density_determine_rad(G_dist, new_node, proportion / 2.0, r_0)
-            rad_high = density_determine_rad(G_dist, new_node, proportion, r_0)
+            rad_low = density_determine_rad(
+                graph_raw_dist, new_node, proportion / 2.0, r_0
+            )
+            rad_high = density_determine_rad(graph_raw_dist, new_node, proportion, r_0)
         # Calculate perimeter
-        tmp1 = G_dist.dijkstra(bdy_set=[new_node], max_dist=rad_high)
+        tmp1 = graph_raw_dist.dijkstra(bdy_set=[new_node], max_dist=rad_high)
         tmp2 = tmp1 <= rad_high
         tmp3 = ((tmp1 > rad_low) * tmp2).nonzero()[0]
         # Update perim
@@ -281,10 +293,14 @@ def coreset_dijkstras(
             new_node = np.random.choice(avail_nodes, size=1).item()
             coreset.append(new_node)
             if use_density:
-                rad_low = density_determine_rad(G_dist, new_node, proportion / 2.0, r_0)
-                rad_high = density_determine_rad(G_dist, new_node, proportion, r_0)
+                rad_low = density_determine_rad(
+                    graph_raw_dist, new_node, proportion / 2.0, r_0
+                )
+                rad_high = density_determine_rad(
+                    graph_raw_dist, new_node, proportion, r_0
+                )
             # Calculate perimeter
-            tmp1 = G_dist.dijkstra(bdy_set=[new_node], max_dist=rad_high)
+            tmp1 = graph_raw_dist.dijkstra(bdy_set=[new_node], max_dist=rad_high)
             tmp2 = tmp1 <= rad_high
             tmp3 = ((tmp1 > rad_low) * tmp2).nonzero()[0]
 
@@ -296,11 +312,15 @@ def coreset_dijkstras(
             new_node = np.random.choice(perim, size=1).item()
             coreset.append(new_node)
             if use_density:
-                rad_low = density_determine_rad(G_dist, new_node, proportion / 2.0, r_0)
-                rad_high = density_determine_rad(G_dist, new_node, proportion, r_0)
+                rad_low = density_determine_rad(
+                    graph_raw_dist, new_node, proportion / 2.0, r_0
+                )
+                rad_high = density_determine_rad(
+                    graph_raw_dist, new_node, proportion, r_0
+                )
 
             # Calculate perimeter from new node
-            tmp1 = G_dist.dijkstra(bdy_set=[new_node], max_dist=rad_high)
+            tmp1 = graph_raw_dist.dijkstra(bdy_set=[new_node], max_dist=rad_high)
             tmp2 = tmp1 <= rad_high
             tmp3 = ((tmp1 > rad_low) * tmp2).nonzero()[0]
             tmp4 = (tmp1 <= rad_low).nonzero()[0]
@@ -692,24 +712,15 @@ def perform_al_experiment(
     count_unusual_cases = 0
     unusual_acc_list = []
 
+    assert dataset_chosen in ["open_sar_ship", "fusar"], "Invalid dataset"
+
     # Perform the experiment for experiment_time times
     for i in range(experiment_time):
         start = timeit.default_timer()
         with torch.no_grad():
             torch.cuda.empty_cache()
 
-        if dataset_chosen == "open_sar":
-            # Load labels
-            data, labels = utils.load_dataset(
-                "open_sar_ship", return_torch=False, concatenate=True
-            )
-        elif dataset_chosen == "fusar":
-            # Load labels
-            data, labels = utils.load_dataset(
-                "fusar", return_torch=False, concatenate=True
-            )
-        else:
-            assert False, "Chosen dataset could not be loaded. Check for typos"
+        data, labels = utils.load_dataset(dataset_chosen, return_torch=False)
 
         # Mimic that we know a percentage of data, and don't know for the rest
         # Do transfer learning merely using these
@@ -764,9 +775,7 @@ def perform_al_experiment(
                     data_info=data_info,
                 )
             # Load labels
-            _, labels = utils.load_dataset(
-                "open_sar_ship", return_torch=False, concatenate=True
-            )
+            _, labels = utils.load_dataset("open_sar_ship", return_torch=False)
             knn_data = gl.weightmatrix.knnsearch(
                 X, knn_num, method="annoy", similarity="angular"
             )
@@ -785,9 +794,7 @@ def perform_al_experiment(
                     data_info=data_info,
                 )
             # Load labels
-            _, labels = utils.load_dataset(
-                "fusar", return_torch=False, concatenate=True
-            )
+            _, labels = utils.load_dataset("fusar", return_torch=False)
             knn_data = gl.weightmatrix.knnsearch(
                 X, knn_num, method="annoy", similarity="angular"
             )
@@ -840,13 +847,6 @@ def perform_al_experiment(
 
             print(acq_fun, al_mtd)
             start = timeit.default_timer()
-
-            ##DEBUGGING
-            # print(X)
-            # print(labels)
-            # print(W)
-            # print(coreset)
-            # The error is that we need to pass everything in as numpy arrays
 
             _, list_num_labels, list_acc = coreset_run_experiment(
                 X,
