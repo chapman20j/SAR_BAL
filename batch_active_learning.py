@@ -91,16 +91,76 @@ AL_METHODS: list[str] = ["local_max", "random", "topn_max", "acq_sample", "globa
 AL_METHOD_NAMES = ["LocalMax", "Random", "TopMax", "Acq_sample", "Sequential"]
 
 # TODO: Check that these are originals
+
+# TODO: Don't want just max new samples. Need the max amount of data used
+#           M           O               F
+# SIZES:    6874        2296            4856
+# final %:  7%          30%             63%
+# Samples:  481         690             3060
+# FT %:     5%          5%              5%
+# FT:       344         115             243
+# FT new:   137         574             2816
+
+_MAX_NEW_SAMPLES_PROPORTIONS: dict[str, float] = {
+    "mstar": 0.07,
+    "open_sar_ship": 0.3,
+    "fusar": 0.63,
+}
+
+# MAX_NEW_SAMPLES_DICT: dict[str, int] = {
+#    "mstar": 481,
+#    "open_sar_ship": 690,
+#    "fusar": 3060,
+# }
+
 MAX_NEW_SAMPLES_DICT: dict[str, int] = {
-    "mstar": 481,
-    "open_sar_ship": 690,
-    "fusar": 3060,
+    name: int(utils.SAR_DATASET_SIZE_DICT[name] * _MAX_NEW_SAMPLES_PROPORTIONS[name])
+    for name in utils.AVAILABLE_SAR_DATASETS
 }
+
+
+# FINE_TUNED_MAX_NEW_SAMPLES_DICT: dict[str, int] = {
+#    "mstar": 137,
+#    "open_sar_ship": 574,
+#    "fusar": 2816,
+# }
+
+
 FINE_TUNED_MAX_NEW_SAMPLES_DICT: dict[str, int] = {
-    "mstar": 137,
-    "open_sar_ship": 574,
-    "fusar": 2816,
+    name: int(
+        MAX_NEW_SAMPLES_DICT[name]
+        - utils.FINE_TUNING_DATA_PROPORTION * utils.SAR_DATASET_SIZE_DICT[name]
+    )
+    for name in utils.AVAILABLE_SAR_DATASETS
 }
+
+# TODO: MOVE THIS
+def determine_bal_steps(
+    dataset: str, embedding: str, al_mtd: str, batch_size: int = BATCH_SIZE
+) -> tuple[int, int]:
+    """
+
+    :return:
+        number of steps to runs batch active learning for
+        the number of samples remaining
+    """
+    assert dataset in utils.AVAILABLE_SAR_DATASETS
+    assert embedding in utils.AVAILABLE_EMBEDDINGS
+    assert al_mtd in AL_METHODS
+
+    num_steps: int = 0
+
+    if embedding == "fine_tuned_tl":
+        num_steps = FINE_TUNED_MAX_NEW_SAMPLES_DICT[dataset]
+    else:
+        num_steps = MAX_NEW_SAMPLES_DICT[dataset]
+
+    if al_mtd == "global_max":
+        return num_steps, 0
+    else:
+        # TODO: THIS won't use all the samples. Just have it do a smaller batch at the end when doing bal stuff
+        return num_steps // batch_size, num_steps % batch_size
+
 
 BALOutputType = Union[
     tuple[np.ndarray, list[int], np.ndarray, float],
@@ -449,7 +509,10 @@ def random_sample_val(val: np.ndarray, sample_num: int) -> np.ndarray:
     """
     Docstring
     """
-    assert not np.any(val < -1e-5), "random_sample_val: negative values aren't allowed"
+    # assert not np.any(val < -1e-2), "random_sample_val: negative values aren't allowed"
+    # Give all points some probability
+    min_tol = 1.0 / len(val)
+    val += min_tol - np.min(val)
     probs = val / np.sum(val)
     return np.random.choice(len(val), size=sample_num, replace=False, p=probs)
 
@@ -463,20 +526,19 @@ def coreset_run_experiment(
     labels: np.ndarray,
     W: csr_matrix,
     coreset: list[int],
-    num_iter: int = 1,
-    method: str = "Laplace",
-    display: bool = False,
-    use_prior: bool = False,
-    al_mtd: str = "local_max",
-    display_all_times: bool = False,
-    acq_fun: str = "uc",
+    num_iter: int,
+    al_mtd: str,
+    acq_fun: str,
     knn_data: Optional[tuple[np.ndarray, np.ndarray]] = None,
-    mtd_para=None,  #'NoneType' could also be tuple i think
+    display_all_times: bool = False,  # TODO: The following parameters aren't changed in experiments
+    method: str = "Laplace",
+    use_prior: bool = False,
+    display: bool = False,
     savefig: bool = False,
     savefig_folder: str = "../BAL_figures",
     batchsize: int = BATCH_SIZE,
-    dist_metric: str = "euclidean",
-    knn_size: int = 50,
+    dist_metric: str = "angular",
+    knn_size: int = utils.KNN_NUM,
     q: int = 1,
     thresholding: int = 0,
 ) -> BALOutputType:
@@ -503,10 +565,7 @@ def coreset_run_experiment(
         # knn_ind, knn_dist = knn_data
 
     if al_mtd == "local_max":
-        if mtd_para:
-            k, thresh = mtd_para
-        else:
-            k, thresh = np.inf, 0
+        k, thresh = np.inf, 0
 
     list_num_labels = []
     list_acc = np.array([]).astype(np.float64)

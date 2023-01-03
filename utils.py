@@ -30,15 +30,16 @@ from torchvision.models.feature_extraction import create_feature_extractor
 from torchvision import transforms
 
 import graphlearning as gl
+from models import CVAE
 
 ################################################################################
 ## Default Parameters
 
-# TODO: CHECK THESE ARE ORIGINALS
 KNN_NUM: int = 50
-TL_EPOCHS: int = 10
+TL_EPOCHS: int = 30
 ENCODING_BATCH_SIZE: int = 1000
 TL_BATCH_SIZE: int = 64
+FINE_TUNING_DATA_PROPORTION: float = 0.05
 
 AVAILABLE_SAR_DATASETS: list[str] = ["mstar", "open_sar_ship", "fusar"]
 AVAILABLE_EMBEDDINGS: list[str] = ["cnnvae", "zero_shot_tl", "fine_tuned_tl"]
@@ -58,6 +59,10 @@ PYTORCH_NEURAL_NETWORKS: list[str] = [
     "ResNeXt",
     "Wide ResNet",
 ]
+# https://pytorch.org/hub/research-models
+# TODO: Remove the torchvision.transforms.Normalize()
+# Nets with batchnorm: resnets,
+#   without: alexnet, densenet,
 
 PYTORCH_NEURAL_NETWORKS_DICT: dict[str, str] = {
     "ResNet": "resnet18",
@@ -114,9 +119,9 @@ def CNNVAE(
     if dataset == "mstar":
         model_path = "./models/SAR10_CNNVAE.pt"
     elif dataset == "open_sar_ship":
-        model_path = "models/OpenSarShip_CNNVAE.pt"
+        model_path = "./models/OpenSarShip_CNNVAE.pt"
     else:
-        model_path = "models/Fusar_CNNVAE.pt"
+        model_path = "./models/Fusar_CNNVAE.pt"
 
     # Encode Dataset
     data = encode_dataset(dataset, model_path, batch_size=1000)
@@ -251,7 +256,7 @@ def load_dataset_fine_tuned_tl(
 
     # Get train-test split
     dataset_size = SAR_DATASET_SIZE_DICT[dataset]
-    tl_num = round(dataset_size * 0.05)
+    tl_num = round(dataset_size * FINE_TUNING_DATA_PROPORTION)
     train_ind = np.random.choice(dataset_size, size=tl_num, replace=False)
     test_ind = np.setdiff1d(np.arange(dataset_size), train_ind)
 
