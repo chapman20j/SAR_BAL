@@ -1,5 +1,7 @@
 # utils.py
 """
+Authors: James, Bohan, and Zheng
+
 This utils file contains useful code for loading and embedding the MSTAR,
 OpenSARShip, and FUSAR-Ship datasets.  This code handles all the training
 for neural networks also. The available embeddings are:
@@ -101,23 +103,23 @@ def CNNVAE(
     """
     Embeds the chosen dataset using a trained CNNVAE.
 
-    param dataset:
+    :param dataset:
     """
     assert dataset in AVAILABLE_SAR_DATASETS, "Invalid Dataset"
 
     # Load Dataset
-    X, labels = load_dataset(dataset, return_torch=False)
+    data, labels = load_dataset(dataset, return_torch=False)
 
     # Determine CNNVAE model
     if dataset == "mstar":
         model_path = "./models/SAR10_CNNVAE.pt"
     elif dataset == "open_sar_ship":
-        model_path = "models/open_sar_ship_CNN.pt"
+        model_path = "models/OpenSarShip_CNNVAE.pt"
     else:
-        model_path = "models/fusar_CNN.pt"
+        model_path = "models/Fusar_CNNVAE.pt"
 
     # Encode Dataset
-    X = encode_dataset(dataset, model_path, batch_size=1000)
+    data = encode_dataset(dataset, model_path, batch_size=1000)
 
     if include_knn_data:
         try:
@@ -128,12 +130,12 @@ def CNNVAE(
             # Compute knn data
             print("Computing knn_data")
             knn_data = gl.weightmatrix.knnsearch(
-                X, knn_num, method="annoy", similarity="angular"
+                data, knn_num, method="annoy", similarity="angular"
             )
 
-        return X, labels, knn_data
+        return data, labels, knn_data
     else:
-        return X, labels
+        return data, labels
 
 
 def zero_shot_TL(
@@ -224,16 +226,6 @@ def load_dataset(
         hdr, _, mag, phase = _load_mstar("data/MSTAR")
         data = _polar_transform_mstar(mag, phase)
         target, _ = _targets_to_labels_mstar(hdr)
-
-        mstar_size = SAR_DATASET_SIZE_DICT["mstar"]
-        tl_num = round(mstar_size * 0.05)
-        train_ind = np.random.choice(mstar_size, size=tl_num, replace=False)
-        test_ind = np.setdiff1d(np.arange(mstar_size), train_ind)
-
-        data_train = data[train_ind, ...]
-        data_test = data[test_ind, ...]
-        target_train = target[train_ind]
-        target_test = target[test_ind]
     else:
         assert False, "Code not implemented for this dataset"
 
@@ -313,9 +305,6 @@ def _apply_data_augmentation(data: torch.Tensor, reshape: bool = True) -> torch.
 
     # All pytorch CNN assume the image is 3 channel
     # Turn image data into 3 channels if use pytorch pretrained CNN
-    # data_shape = list(data.shape)
-    # data_shape[1] = 3
-    # data = data.expand(data_shape)
     if reshape:
         data = data.expand([-1, 3, -1, -1])
 
@@ -622,7 +611,9 @@ def encode_pretrained(
     # Load the desired model and encode data
     if model_type in PYTORCH_NEURAL_NETWORKS:
         model_used = models_dict.get(model_type)
-        model = torch.hub.load("pytorch/vision:v0.10.0", model_used, pretrained=True)
+        model = torch.hub.load(
+            "pytorch/vision:v0.10.0", model_used, pretrained=True, map_location=device
+        )
         model.eval()
 
         feature_layer = _determine_feature_layer(model_type)
@@ -632,7 +623,9 @@ def encode_pretrained(
             )
             feature_extractor.eval()
 
-            encoded_data = feature_extractor(data)[feature_layer].cpu().numpy()
+            encoded_data = (
+                feature_extractor(data.to(device))[feature_layer].cpu().numpy()
+            )
     else:
         model = torch.load(model_type, map_location=device)
         model.eval()
@@ -667,6 +660,7 @@ def encode_transfer_learning(
     device = torch.device(_determine_hardware())
 
     if (model_type is None) or (model_type in PYTORCH_NEURAL_NETWORKS):
+        # TODO: Need to know what is in the coreset so should return the indices probably
         # Load training and testing data
         if data_info is None:
             (
@@ -763,8 +757,8 @@ def encode_transfer_learning(
         # TODO: IDK if we want this
         data = NormalizeData(data)
 
-        # data = data.to(device)
-        model_ft.cpu()
+        data = data.to(device)
+        # model_ft.cpu()
         model_ft.eval()
 
         if model_type is None:

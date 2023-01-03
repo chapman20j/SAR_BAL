@@ -878,6 +878,7 @@ def perform_al_experiment(
             elif list_acc[-1] < lowest_accuracy_list[acq_fun_ind]:
                 lowest_accuracy_list[acq_fun_ind] = list_acc[-1]
 
+            # Just counting number of runs below SoTA for one dataset (open_sar_ship)
             if list_acc[-1] <= 0.8669:
                 count_unusual_cases += 1
                 unusual_acc_list.append(list_acc[-1])
