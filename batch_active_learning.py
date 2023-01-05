@@ -10,14 +10,12 @@ Finish docstring
 
 import timeit
 import os
-import random
 
 from typing import Optional, Union
 from collections.abc import Iterable
 
 import numpy as np
 import matplotlib.pyplot as plt
-import torch
 
 import graphlearning.active_learning as al
 import graphlearning as gl
@@ -48,38 +46,6 @@ import utils
 # """Quick function description"""
 
 
-########
-# For type checking
-import functools
-
-
-def check_types(fun):
-    """Decorator for checking types"""
-
-    @functools.wraps(fun)
-    def types_wrapper(*args, **kwargs):
-        out = fun(*args, **kwargs)
-        print(fun.__name__)
-        print("in")
-        for v in args:
-            print("\t", type(v))
-        for k, v in kwargs.items():
-            print("\t", k, type(v))
-        print("out")
-        if isinstance(out, Iterable):
-            for x in out:
-                print("\t", type(x))
-        else:
-            print("\t", type(out))
-        print()
-        return out
-
-    return types_wrapper
-
-
-########
-
-
 ################################################################################
 ## Default Parameters
 
@@ -90,28 +56,12 @@ ACQUISITION_FUNCTIONS: list[str] = ["uc", "vopt", "mc", "mcvopt"]
 AL_METHODS: list[str] = ["local_max", "random", "topn_max", "acq_sample", "global_max"]
 AL_METHOD_NAMES = ["LocalMax", "Random", "TopMax", "Acq_sample", "Sequential"]
 
-# TODO: Check that these are originals
-
-# TODO: Don't want just max new samples. Need the max amount of data used
-#           M           O               F
-# SIZES:    6874        2296            4856
-# final %:  7%          30%             63%
-# Samples:  481         690             3060
-# FT %:     5%          5%              5%
-# FT:       344         115             243
-# FT new:   137         574             2816
-
 _MAX_NEW_SAMPLES_PROPORTIONS: dict[str, float] = {
     "mstar": 0.07,
     "open_sar_ship": 0.3,
     "fusar": 0.63,
 }
 
-# MAX_NEW_SAMPLES_DICT: dict[str, int] = {
-#    "mstar": 481,
-#    "open_sar_ship": 690,
-#    "fusar": 3060,
-# }
 
 MAX_NEW_SAMPLES_DICT: dict[str, int] = {
     name: int(utils.SAR_DATASET_SIZE_DICT[name] * _MAX_NEW_SAMPLES_PROPORTIONS[name])
@@ -119,58 +69,12 @@ MAX_NEW_SAMPLES_DICT: dict[str, int] = {
 }
 
 
-# FINE_TUNED_MAX_NEW_SAMPLES_DICT: dict[str, int] = {
-#    "mstar": 137,
-#    "open_sar_ship": 574,
-#    "fusar": 2816,
-# }
-
-
-FINE_TUNED_MAX_NEW_SAMPLES_DICT: dict[str, int] = {
-    name: int(
-        MAX_NEW_SAMPLES_DICT[name]
-        - utils.FINE_TUNING_DATA_PROPORTION * utils.SAR_DATASET_SIZE_DICT[name]
-    )
-    for name in utils.AVAILABLE_SAR_DATASETS
-}
-
-# TODO: MOVE THIS
-def determine_bal_steps(
-    dataset: str, embedding: str, al_mtd: str, batch_size: int = BATCH_SIZE
-) -> tuple[int, int]:
-    """
-
-    :return:
-        number of steps to runs batch active learning for
-        the number of samples remaining
-    """
-    assert dataset in utils.AVAILABLE_SAR_DATASETS
-    assert embedding in utils.AVAILABLE_EMBEDDINGS
-    assert al_mtd in AL_METHODS
-
-    num_steps: int = 0
-
-    if embedding == "fine_tuned_tl":
-        num_steps = FINE_TUNED_MAX_NEW_SAMPLES_DICT[dataset]
-    else:
-        num_steps = MAX_NEW_SAMPLES_DICT[dataset]
-
-    if al_mtd == "global_max":
-        return num_steps, 0
-    else:
-        # TODO: THIS won't use all the samples. Just have it do a smaller batch at the end when doing bal stuff
-        return num_steps // batch_size, num_steps % batch_size
-
-
-BALOutputType = Union[
-    tuple[np.ndarray, list[int], np.ndarray, float],
-    tuple[np.ndarray, list[int], np.ndarray],
-]
+BALOutputType = tuple[np.ndarray, list[int], np.ndarray, float]
 
 ################################################################################
 ### coreset functions
 
-# @check_types
+
 def density_determine_rad(
     graph: gl.graph,
     node: int,
@@ -237,9 +141,8 @@ def density_determine_rad(
     return rad
 
 
-# @check_types
 def coreset_dijkstras(
-    G: gl.graph,
+    graph: gl.graph,
     rad: float,
     data: Optional[np.ndarray] = None,
     initial: Optional[list[int]] = None,
@@ -278,9 +181,9 @@ def coreset_dijkstras(
     use_density, proportion, r_0 = density_info
 
     # Once all points have been seen, we end this
-    points_seen = np.zeros(G.num_nodes)
+    points_seen = np.zeros(graph.num_nodes)
 
-    knn_val = G.weight_matrix[0].count_nonzero()
+    knn_val = graph.weight_matrix[0].count_nonzero()
 
     # Use distances without a kernel applied
     if knn_data:
@@ -295,18 +198,14 @@ def coreset_dijkstras(
     graph_raw_dist = gl.graph(w_dist)
 
     # Construct the perimeter from the initial set
-    n = len(initial)
-    for i in range(n):
+    # num_init = len(initial)
+    for node in initial:
         if use_density:
-            rad_low = density_determine_rad(
-                graph_raw_dist, initial[i], proportion / 2.0, r_0
-            )
-            rad_high = density_determine_rad(
-                graph_raw_dist, initial[i], proportion, r_0
-            )
+            rad_low = density_determine_rad(graph_raw_dist, node, proportion / 2.0, r_0)
+            rad_high = density_determine_rad(graph_raw_dist, node, proportion, r_0)
         else:
             # Calculate perimeter from new node
-            tmp1 = graph_raw_dist.dijkstra(bdy_set=[initial[i]], max_dist=rad_high)
+            tmp1 = graph_raw_dist.dijkstra(bdy_set=[node], max_dist=rad_high)
             tmp2 = tmp1 <= rad_high
             tmp3 = ((tmp1 > rad_low) * tmp2).nonzero()[0]
             tmp4 = (tmp1 <= rad_low).nonzero()[0]
@@ -406,7 +305,6 @@ def coreset_dijkstras(
     return coreset
 
 
-# @check_types
 def _dac_plot_fun(
     data: np.ndarray, points_seen: np.ndarray, coreset: list[int], perim: list[int]
 ) -> None:
@@ -460,11 +358,11 @@ def _dac_plot_fun(
 ################################################################################
 ## util functions for batch active learning
 
-# @check_types
+
 def local_maxes_k_new(
     knn_ind: np.ndarray,
     acq_array: np.ndarray,
-    k: int,  # TODO: Got a float for this from somewhere
+    k: int,
     top_num: int,
     thresh: int = 0,
 ) -> np.ndarray:
@@ -483,7 +381,7 @@ def local_maxes_k_new(
     # If weights(v) >= weights(u) for all u in neighbors, then v is a local max
     local_maxes = np.array([])
     K = knn_ind.shape[1]
-    if k > K:
+    if k > K or k == -1:
         k = K
 
     sorted_ind = np.argsort(acq_array)[::-1]
@@ -520,17 +418,16 @@ def random_sample_val(val: np.ndarray, sample_num: int) -> np.ndarray:
 ################################################################################
 
 ## implement batch active learning function
-# @check_types
-def coreset_run_experiment(
+def batch_active_learning_experiment(
     X: np.ndarray,
     labels: np.ndarray,
     W: csr_matrix,
     coreset: list[int],
-    num_iter: int,
+    new_samples: int,
     al_mtd: str,
     acq_fun: str,
     knn_data: Optional[tuple[np.ndarray, np.ndarray]] = None,
-    display_all_times: bool = False,  # TODO: The following parameters aren't changed in experiments
+    display_all_times: bool = False,  # The following parameters aren't changed in experiments
     method: str = "Laplace",
     use_prior: bool = False,
     display: bool = False,
@@ -565,7 +462,7 @@ def coreset_run_experiment(
         # knn_ind, knn_dist = knn_data
 
     if al_mtd == "local_max":
-        k, thresh = np.inf, 0
+        k, thresh = -1, 0
 
     list_num_labels = []
     list_acc = np.array([]).astype(np.float64)
@@ -599,7 +496,7 @@ def coreset_run_experiment(
     )
 
     # perform classification with GSSL classifier
-    u = model.fit(act.current_labeled_set, act.current_labels)
+    classification = model.fit(act.current_labeled_set, act.current_labels)
     if display_all_times:
         t_al_e = timeit.default_timer()
         print("Active learning setup time = ", t_al_e - t_al_s)
@@ -629,16 +526,25 @@ def coreset_run_experiment(
     list_num_labels.append(len(act.current_labeled_set))
     list_acc = np.append(list_acc, acc)
 
-    for iteration in range(num_iter):
+    if al_mtd == "global_max":
+        batchsize = 1
+
+    remaining_samples: int = new_samples
+
+    iteration: int = 0
+
+    while remaining_samples > 0:
+        # When you get to the last iteration, don't sample more points than desired
+        batchsize = min(batchsize, remaining_samples)
 
         if display_all_times:
             t_iter_s = timeit.default_timer()
 
         act.candidate_inds = np.setdiff1d(act.training_set, act.current_labeled_set)
         if acq_fun in ["mc", "uc", "mcvopt"]:
-            acq_vals = acq_f.compute_values(act, u)
+            acq_vals = acq_f.compute_values(act, classification)
         elif acq_fun == "vopt":
-            acq_vals = acq_f.compute_values(act)
+            acq_vals = acq_f.compute_values(act, None)
 
         modded_acq_vals = np.zeros(len(X))
         modded_acq_vals[act.candidate_inds] = acq_vals
@@ -689,7 +595,7 @@ def coreset_run_experiment(
             batch, labels[batch]
         )  # update the active_learning object's labeled set
 
-        u = model.fit(act.current_labeled_set, act.current_labels)
+        classification = model.fit(act.current_labeled_set, act.current_labels)
         current_label_guesses = model.predict()
         acc = gl.ssl.ssl_accuracy(
             current_label_guesses, labels, len(act.current_labeled_set)
@@ -725,6 +631,12 @@ def coreset_run_experiment(
             t_iter_e = timeit.default_timer()
             print("Iteration:", iteration, "Iteration time = ", t_iter_e - t_iter_s)
 
+        iteration += 1
+        if isinstance(batch, Iterable):
+            remaining_samples -= len(batch)
+        else:
+            remaining_samples -= 1
+
     t_end = timeit.default_timer()
     t_total = t_end - t_al_s
 
@@ -739,236 +651,6 @@ def coreset_run_experiment(
 
     if display:
         # Don't want to return the time if we are also displaying things
-        return labeled_ind, list_num_labels, list_acc
+        return labeled_ind, list_num_labels, list_acc, np.inf
     else:
         return labeled_ind, list_num_labels, list_acc, t_total
-
-
-## perform batch active learning for several times and show average&highest result
-def perform_al_experiment(
-    dataset_chosen,
-    embedding_mode="just_transfer",
-    acq_fun_list=["uc", "vopt", "mc", "mcvopt"],
-    density_radius_param=0.5,
-    knn_num=20,
-    num_iter=1,
-    method="Laplace",
-    al_mtd="local_max",
-    acq_fun="uc",
-    knn_data=None,
-    batchsize=BATCH_SIZE,
-    experiment_time=10,
-):
-    """
-    FUNCTION SIGNATURE HERE!!
-
-    """
-
-    highest_accuracy_list = [0] * len(acq_fun_list)
-    average_accuracy_list = [0] * len(acq_fun_list)
-    lowest_accuracy_list = [0] * len(acq_fun_list)
-
-    count_unusual_cases = 0
-    unusual_acc_list = []
-
-    assert dataset_chosen in ["open_sar_ship", "fusar"], "Invalid dataset"
-
-    # Perform the experiment for experiment_time times
-    for i in range(experiment_time):
-        start = timeit.default_timer()
-        with torch.no_grad():
-            torch.cuda.empty_cache()
-
-        data, labels = utils.load_dataset(dataset_chosen, return_torch=False)
-
-        # Mimic that we know a percentage of data, and don't know for the rest
-        # Do transfer learning merely using these
-        percent_known_data = 0
-        if dataset_chosen == "open_sar":
-            percent_known_data = 0.07
-        else:
-            percent_known_data = 0.07
-        known_data_ind = gl.trainsets.generate(labels, rate=percent_known_data).tolist()
-        known_data = data[known_data_ind]
-        known_labels = labels[known_data_ind]
-
-        # Generate the initial set
-        initial = gl.trainsets.generate(labels, rate=1).tolist()
-
-        # Percent of known data to use as training data for transfer learning
-        training_percent = 0.7
-        transfer_train_ind = random.sample(
-            range(len(known_data)), round(len(known_data) * training_percent)
-        )
-        transfer_testing_ind = np.array(
-            [ind for ind in range(len(known_data)) if ind not in transfer_train_ind]
-        ).astype(int)
-
-        # Convert to torch for use
-        known_data = torch.from_numpy(known_data)
-        known_labels = torch.from_numpy(known_labels)
-
-        # Setup the training and testing data for transfer learning
-        training_data = known_data[transfer_train_ind]
-        training_label = known_labels[transfer_train_ind]
-        testing_data = known_data[transfer_testing_ind]
-        testing_label = known_labels[transfer_testing_ind]
-
-        print("Transfer learning training data: " + str(len(training_data)))
-        print("Transfer learning testing data: " + str(len(testing_data)))
-
-        data_info = [training_data, training_label, testing_data, testing_label]
-
-        if dataset_chosen == "open_sar":
-            # Load encoded dataset
-            if embedding_mode == "just_transfer":
-                X, labels = utils.encode_pretrained(
-                    "open_sar_ship", "AlexNet", transformed=True
-                )
-            else:
-                X = utils.encode_transfer_learning(
-                    "open_sar_ship",
-                    model_type="AlexNet",
-                    transfer_batch_size=64,
-                    epochs=30,
-                    data_info=data_info,
-                )
-            # Load labels
-            _, labels = utils.load_dataset("open_sar_ship", return_torch=False)
-            knn_data = gl.weightmatrix.knnsearch(
-                X, knn_num, method="annoy", similarity="angular"
-            )
-        elif dataset_chosen == "fusar":
-            # Load encoded dataset
-            if embedding_mode == "just_transfer":
-                X, labels = utils.encode_pretrained(
-                    "fusar", "ShuffleNet", transformed=True
-                )
-            else:
-                X = utils.encode_transfer_learning(
-                    "fusar",
-                    model_type="ShuffleNet",
-                    transfer_batch_size=64,
-                    epochs=30,
-                    data_info=data_info,
-                )
-            # Load labels
-            _, labels = utils.load_dataset("fusar", return_torch=False)
-            knn_data = gl.weightmatrix.knnsearch(
-                X, knn_num, method="annoy", similarity="angular"
-            )
-        else:
-            assert False, "Chosen dataset could not be loaded. Check for typos"
-
-        # print("***HERE: ", type(labels))
-
-        print("Constructing Graph Learning Objects")
-        W = gl.weightmatrix.knn(X, knn_num, kernel="gaussian", knn_data=knn_data)
-        G = gl.graph(W)
-        end = timeit.default_timer()
-
-        print("Embedding Complete")
-        print(f"Time taken = {end - start}")
-
-        # Generate Coreset
-        # Use the percent radius because it should be more robust across datasets
-        coreset = coreset_dijkstras(
-            G,
-            rad=0.2,
-            data=X,
-            initial=initial,
-            density_info=(True, density_radius_param, 1),
-            knn_data=knn_data,
-        )
-        print(
-            "Coreset Size = {}\t Percent of data = {}%".format(
-                len(coreset), round(100 * len(coreset) / len(X), 2)
-            )
-        )
-        print("Coreset = ", coreset)
-
-        batchsize = BATCH_SIZE
-        if dataset_chosen == "open_sar":
-            max_new_samples = 690
-        else:
-            max_new_samples = 2910
-
-        acq_fun_ind = 0
-        for acq_fun in acq_fun_list:
-
-            if al_mtd != "global_max":
-                num_iter = int(max_new_samples / batchsize)
-            else:
-                num_iter = max_new_samples
-
-            if acq_fun == "vopt" or acq_fun == "mcvopt":
-                num_iter += 1
-
-            print(acq_fun, al_mtd)
-            start = timeit.default_timer()
-
-            _, list_num_labels, list_acc = coreset_run_experiment(
-                X,
-                labels,
-                W,
-                coreset,
-                num_iter=num_iter,
-                method=method,
-                display=False,
-                use_prior=False,
-                al_mtd=al_mtd,
-                display_all_times=False,
-                acq_fun=acq_fun,
-                knn_data=knn_data,
-                mtd_para=None,
-                savefig=False,
-                savefig_folder="../BAL_figures",
-                batchsize=batchsize,
-                dist_metric="angular",
-                q=10,
-                thresholding=0,
-            )
-
-            average_accuracy_list[acq_fun_ind] += list_acc[-1]
-            if list_acc[-1] > highest_accuracy_list[acq_fun_ind]:
-                highest_accuracy_list[acq_fun_ind] = list_acc[-1]
-            if i == 0:
-                lowest_accuracy_list[acq_fun_ind] = list_acc[-1]
-            elif list_acc[-1] < lowest_accuracy_list[acq_fun_ind]:
-                lowest_accuracy_list[acq_fun_ind] = list_acc[-1]
-
-            # Just counting number of runs below SoTA for one dataset (open_sar_ship)
-            if list_acc[-1] <= 0.8669:
-                count_unusual_cases += 1
-                unusual_acc_list.append(list_acc[-1])
-
-            acq_fun_ind += 1
-
-    average_accuracy_list = [acc / experiment_time for acc in average_accuracy_list]
-
-    # Print out the experiment result
-    for i in range(len(acq_fun_list)):
-        print(acq_fun_list[i] + " average accuracy: " + str(average_accuracy_list[i]))
-        print(acq_fun_list[i] + " highest accuracy: " + str(highest_accuracy_list[i]))
-        print(acq_fun_list[i] + " lowest accuracy: " + str(lowest_accuracy_list[i]))
-
-    print(unusual_acc_list)
-    print("Unusual behavior happens " + str(count_unusual_cases) + " times")
-
-
-################################################################################
-## toy datasets
-def gen_checkerboard_3(num_samples=500, randseed=123):
-    """Function to generate the toy dataset: checkerboard 3"""
-    np.random.seed(randseed)
-    X = np.random.rand(num_samples, 2)
-    labels = np.mod(np.floor(X[:, 0] * 3) + np.floor(X[:, 1] * 3), 3).astype(np.int64)
-    return X, labels
-
-
-def gen_stripe_3(num_samples=500, width=1 / 3, randseed=123):
-    """Function to generate the toy dataset: stripe 3"""
-    np.random.seed(randseed)
-    X = np.random.rand(num_samples, 2)
-    labels = np.mod(np.floor(X[:, 0] / width + X[:, 1] / width), 3).astype(np.int64)
-    return X, labels
