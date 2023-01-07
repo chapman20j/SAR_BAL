@@ -242,6 +242,9 @@ def coreset_dijkstras(
         # Update points seen
         points_seen[tmp2] = 1
 
+        if plot_steps and data is not None:
+            _dac_plot_fun(data, points_seen, coreset, perim)
+
     # Generate the coreset from the remaining stuff
     iterations = 0
 
