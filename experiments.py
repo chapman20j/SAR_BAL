@@ -30,7 +30,7 @@ EXPERIMENT_3_NUM_EXPERIMENTS = 20
 def experiment_1(dataset: str, hardware_acceleration: bool):
     assert dataset in utils.AVAILABLE_SAR_DATASETS, "Invalid dataset"
 
-    X, labels, knn_data, initial = utils.cnnvae(
+    X, labels, knn_data, initial = utils.zero_shot_tl(
         dataset, hardware_acceleration=hardware_acceleration
     )
 
