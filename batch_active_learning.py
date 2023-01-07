@@ -11,7 +11,8 @@ Finish docstring
 import timeit
 import os
 
-from typing import Optional, Union
+# python 3.8 (used in google colab) needs typing.List, typing.Dict and typing.Tuple
+from typing import Optional, List, Dict, Tuple
 from collections.abc import Iterable
 
 import numpy as np
@@ -52,24 +53,24 @@ import utils
 DENSITY_RADIUS: float = 0.2
 BATCH_SIZE: int = 15
 
-ACQUISITION_FUNCTIONS: list[str] = ["uc", "vopt", "mc", "mcvopt"]
-AL_METHODS: list[str] = ["local_max", "random", "topn_max", "acq_sample", "global_max"]
+ACQUISITION_FUNCTIONS: List[str] = ["uc", "vopt", "mc", "mcvopt"]
+AL_METHODS: List[str] = ["local_max", "random", "topn_max", "acq_sample", "global_max"]
 AL_METHOD_NAMES = ["LocalMax", "Random", "TopMax", "Acq_sample", "Sequential"]
 
-_MAX_NEW_SAMPLES_PROPORTIONS: dict[str, float] = {
-    "mstar": 0.07,
-    "open_sar_ship": 0.3,
-    "fusar": 0.63,
+MAX_NEW_SAMPLES_PROPORTIONS: Dict[str, float] = {
+    "mstar": 0.15,
+    "open_sar_ship": 0.35,
+    "fusar": 0.68,
 }
 
 
-MAX_NEW_SAMPLES_DICT: dict[str, int] = {
-    name: int(utils.SAR_DATASET_SIZE_DICT[name] * _MAX_NEW_SAMPLES_PROPORTIONS[name])
+MAX_NEW_SAMPLES_DICT: Dict[str, int] = {
+    name: int(utils.SAR_DATASET_SIZE_DICT[name] * MAX_NEW_SAMPLES_PROPORTIONS[name])
     for name in utils.AVAILABLE_SAR_DATASETS
 }
 
 
-BALOutputType = tuple[np.ndarray, list[int], np.ndarray, float]
+BALOutputType = Tuple[np.ndarray, List[int], np.ndarray, float]
 
 ################################################################################
 ### coreset functions
@@ -145,12 +146,12 @@ def coreset_dijkstras(
     graph: gl.graph,
     rad: float,
     data: Optional[np.ndarray] = None,
-    initial: Optional[list[int]] = None,
-    density_info: tuple[bool, float, float] = (False, DENSITY_RADIUS, 1.0),
+    initial: Optional[List[int]] = None,
+    density_info: Tuple[bool, float, float] = (False, DENSITY_RADIUS, 1.0),
     similarity: str = "euclidean",
-    knn_data: Optional[tuple[np.ndarray, np.ndarray]] = None,
+    knn_data: Optional[Tuple[np.ndarray, np.ndarray]] = None,
     plot_steps: bool = False,
-) -> list[int]:
+) -> List[int]:
     """
     Runs the Dijkstra's Annulus Coreset (DAC) method outlined in the paper. The
         algorithm uses inner radius which is half of rad. When using density
@@ -170,7 +171,7 @@ def coreset_dijkstras(
 
     """
 
-    perim: list[int] = []
+    perim: List[int] = []
     if initial is None:
         initial = []
     coreset = initial.copy()
@@ -306,7 +307,7 @@ def coreset_dijkstras(
 
 
 def _dac_plot_fun(
-    data: np.ndarray, points_seen: np.ndarray, coreset: list[int], perim: list[int]
+    data: np.ndarray, points_seen: np.ndarray, coreset: List[int], perim: List[int]
 ) -> None:
     """
     Function for plotting the steps of the DAC algorithm. It first checks if
@@ -422,11 +423,11 @@ def batch_active_learning_experiment(
     X: np.ndarray,
     labels: np.ndarray,
     W: csr_matrix,
-    coreset: list[int],
+    coreset: List[int],
     new_samples: int,
     al_mtd: str,
     acq_fun: str,
-    knn_data: Optional[tuple[np.ndarray, np.ndarray]] = None,
+    knn_data: Optional[Tuple[np.ndarray, np.ndarray]] = None,
     display_all_times: bool = False,  # The following parameters aren't changed in experiments
     method: str = "Laplace",
     use_prior: bool = False,
@@ -550,10 +551,7 @@ def batch_active_learning_experiment(
         modded_acq_vals[act.candidate_inds] = acq_vals
 
         if al_mtd == "local_max":
-            if knn_data:
-                batch = local_maxes_k_new(
-                    knn_ind, modded_acq_vals, k, batchsize, thresh
-                )
+            batch = local_maxes_k_new(knn_ind, modded_acq_vals, k, batchsize, thresh)
         elif al_mtd == "global_max":
             batch = act.candidate_inds[np.argmax(acq_vals)]
         elif al_mtd == "acq_sample":
@@ -650,7 +648,7 @@ def batch_active_learning_experiment(
     act.reset_labeled_data()
 
     if display:
-        # Don't want to return the time if we are also displaying things
+        # Displaying things takes time, so we return np.inf as default
         return labeled_ind, list_num_labels, list_acc, np.inf
     else:
         return labeled_ind, list_num_labels, list_acc, t_total

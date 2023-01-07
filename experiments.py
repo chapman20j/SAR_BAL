@@ -2,7 +2,7 @@
 """
 DOCSTRING
 """
-
+# TODO: Add all the docstrings in this file
 
 import numpy as np
 import pandas as pd
@@ -13,15 +13,18 @@ import graphlearning as gl
 import batch_active_learning as bal
 import utils
 
-# from models import CVAE
-
+################################################################################
+## Default Parameters
 
 EXPERIMENT_1_SAVE_PATH = "Experiment Results/Experiment 1/"
 EXPERIMENT_2_SAVE_PATH = "Experiment Results/Experiment 2/"
 EXPERIMENT_3_SAVE_PATH = "Experiment Results/Experiment 3/"
 EXPERIMENT_4_SAVE_PATH = "Experiment Results/Experiment 4/"
 
-EXPERIMENT_3_NUM_EXPERIMENTS = 50
+EXPERIMENT_3_NUM_EXPERIMENTS = 20
+
+################################################################################
+## Experiment 1 Functions
 
 
 def experiment_1(dataset: str, hardware_acceleration: bool):
@@ -52,7 +55,7 @@ def experiment_1(dataset: str, hardware_acceleration: bool):
     )
 
     for al_mtd in bal.AL_METHODS:
-        num_new_samples = bal.MAX_NEW_SAMPLES_DICT[dataset] - len(initial)
+        num_new_samples = bal.MAX_NEW_SAMPLES_DICT[dataset] - len(coreset)
 
         # Run experiment
         _, num_labels, acc_vals, al_time = bal.batch_active_learning_experiment(
@@ -131,8 +134,8 @@ def experiment_1_full_save(
     return
 
 
-##################################################################
-## Experiment 2 functions
+################################################################################
+## Experiment 2 Functions
 
 
 def experiment_2_simple_plotter(x_dict, y_dict, dataset):
@@ -184,8 +187,6 @@ def experiment_2(dataset, embedding, hardware_acceleration):
     W = gl.weightmatrix.knn(X, utils.KNN_NUM, kernel="gaussian", knn_data=knn_data)
     G = gl.graph(W)
 
-    num_new_samples = bal.MAX_NEW_SAMPLES_DICT[dataset] - len(initial)
-
     acc_dict = {}
     num_labels_dict = {}
 
@@ -197,6 +198,8 @@ def experiment_2(dataset, embedding, hardware_acceleration):
         density_info=(True, bal.DENSITY_RADIUS, 1),
         knn_data=knn_data,
     )
+
+    num_new_samples = bal.MAX_NEW_SAMPLES_DICT[dataset] - len(coreset)
 
     for acq_fun in bal.ACQUISITION_FUNCTIONS:
 
@@ -228,7 +231,8 @@ def experiment_2(dataset, embedding, hardware_acceleration):
     return num_labels_dict, acc_dict
 
 
-####################################
+################################################################################
+## Experiment 3 Functions
 
 
 def experiment_3(
@@ -267,8 +271,6 @@ def experiment_3(
         W = gl.weightmatrix.knn(X, utils.KNN_NUM, kernel="gaussian", knn_data=knn_data)
         G = gl.graph(W)
 
-        num_new_samples = bal.MAX_NEW_SAMPLES_DICT[dataset] - len(initial)
-
         coreset = bal.coreset_dijkstras(
             G,
             rad=bal.DENSITY_RADIUS,
@@ -277,6 +279,8 @@ def experiment_3(
             density_info=(True, bal.DENSITY_RADIUS, 1),
             knn_data=knn_data,
         )
+
+        num_new_samples = bal.MAX_NEW_SAMPLES_DICT[dataset] - len(coreset)
 
         _, num_labels, acc_vals, _ = bal.batch_active_learning_experiment(
             X,
@@ -297,10 +301,13 @@ def experiment_3(
         "experiments": num_experiments,
         "mean": np.mean(acc_results),
         "std_dev": np.std(acc_results),
+        "max": np.max(acc_results),
+        "data": acc_results,
     }
 
 
-##################
+################################################################################
+## Experiment 4 Functions
 
 
 # Does this use data augmentation? I believe so
@@ -314,7 +321,6 @@ def experiment_4(dataset, network, hardware_acceleration):
     X, labels, knn_data, initial = utils.zero_shot_tl(
         dataset, hardware_acceleration=hardware_acceleration
     )
-    num_new_samples = bal.MAX_NEW_SAMPLES_DICT[dataset] - len(initial)
 
     # Create graph objects
     W = gl.weightmatrix.knn(X, utils.KNN_NUM, kernel="gaussian", knn_data=knn_data)
@@ -328,6 +334,8 @@ def experiment_4(dataset, network, hardware_acceleration):
         density_info=(True, bal.DENSITY_RADIUS, 1),
         knn_data=knn_data,
     )
+
+    num_new_samples = bal.MAX_NEW_SAMPLES_DICT[dataset] - len(coreset)
 
     _, _, acc_vals, _ = bal.batch_active_learning_experiment(
         X,

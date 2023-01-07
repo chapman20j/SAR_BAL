@@ -14,7 +14,8 @@ import os
 import time
 import copy
 
-from typing import Union, Optional
+# python 3.8 (used in google colab) needs typing.List, typing.Dict and typing.Tuple
+from typing import Union, Optional, List, Dict, Tuple
 
 import numpy as np
 
@@ -40,15 +41,15 @@ ENCODING_BATCH_SIZE: int = 1000
 TL_BATCH_SIZE: int = 64
 FINE_TUNING_DATA_PROPORTION: float = 0.05
 
-AVAILABLE_SAR_DATASETS: list[str] = ["mstar", "open_sar_ship", "fusar"]
-AVAILABLE_EMBEDDINGS: list[str] = ["cnnvae", "zero_shot_tl", "fine_tuned_tl"]
-SAR_DATASET_SIZE_DICT: dict[str, int] = {
+AVAILABLE_SAR_DATASETS: List[str] = ["mstar", "open_sar_ship", "fusar"]
+AVAILABLE_EMBEDDINGS: List[str] = ["cnnvae", "zero_shot_tl", "fine_tuned_tl"]
+SAR_DATASET_SIZE_DICT: Dict[str, int] = {
     "mstar": 6874,
     "open_sar_ship": 2296,
     "fusar": 4856,
 }
 
-PYTORCH_NEURAL_NETWORKS: list[str] = [
+PYTORCH_NEURAL_NETWORKS: List[str] = [
     "ResNet",
     "ShuffleNet",
     "AlexNet",
@@ -61,7 +62,7 @@ PYTORCH_NEURAL_NETWORKS: list[str] = [
 
 # Refer to https://pytorch.org/hub/research-models
 # for more information
-PYTORCH_NEURAL_NETWORKS_DICT: dict[str, str] = {
+PYTORCH_NEURAL_NETWORKS_DICT: Dict[str, str] = {
     "ResNet": "resnet18",
     "ShuffleNet": "shufflenet_v2_x0_5",
     "AlexNet": "alexnet",
@@ -72,7 +73,7 @@ PYTORCH_NEURAL_NETWORKS_DICT: dict[str, str] = {
     "Wide ResNet": "wide_resnet50_2",
 }
 
-DEFAULT_NEURAL_NETWORKS_DICT: dict[str, str] = {
+DEFAULT_NEURAL_NETWORKS_DICT: Dict[str, str] = {
     "mstar": "ResNet",
     "open_sar_ship": "AlexNet",
     "fusar": "ShuffleNet",
@@ -81,10 +82,10 @@ DEFAULT_NEURAL_NETWORKS_DICT: dict[str, str] = {
 
 ################################################################################
 ArrayType = Union[torch.Tensor, np.ndarray]
-EmbeddingType = tuple[np.ndarray, np.ndarray, tuple[np.ndarray, np.ndarray], np.ndarray]
+EmbeddingType = Tuple[np.ndarray, np.ndarray, Tuple[np.ndarray, np.ndarray], np.ndarray]
 
 DatasetType = Union[
-    tuple[np.ndarray, np.ndarray], tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray]
+    Tuple[np.ndarray, np.ndarray], Tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray]
 ]
 
 ################################################################################
@@ -227,7 +228,7 @@ def fine_tuned_tl(
 
 def load_dataset(
     dataset: str,
-) -> tuple[np.ndarray, np.ndarray]:
+) -> Tuple[np.ndarray, np.ndarray]:
     """
     Docstring
     """
@@ -262,7 +263,7 @@ def load_dataset(
 def load_dataset_fine_tuned_tl(
     dataset: str,
     shuffle_train_set: bool = False,
-) -> tuple[torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor, np.ndarray]:
+) -> Tuple[torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor, np.ndarray]:
     """
     Creates a train-test split, ensuring that each label occurs in the training set.
     """
@@ -273,7 +274,7 @@ def load_dataset_fine_tuned_tl(
     dataset_size = SAR_DATASET_SIZE_DICT[dataset]
     tl_num = round(dataset_size * FINE_TUNING_DATA_PROPORTION)
     # First pick so that each label occurs
-    each_ind = gl.trainsets.generate(target, rate=1)
+    each_ind = np.array(gl.trainsets.generate(target, rate=1))
 
     # Then pick the rest of the indices
     train_ind = np.random.choice(
@@ -281,6 +282,10 @@ def load_dataset_fine_tuned_tl(
         size=tl_num - len(each_ind),
         replace=False,
     )
+
+    # Now combine them
+    train_ind = np.concatenate((train_ind, each_ind))
+
     test_ind = np.setdiff1d(np.arange(dataset_size), train_ind)
 
     data_train = data[train_ind, ...]
@@ -356,8 +361,8 @@ def train_model(
     optimizer,
     scheduler,
     device: torch.device,
-    dataloaders: dict[str, DataLoader],
-    dataset_sizes: dict[str, int],
+    dataloaders: Dict[str, DataLoader],
+    dataset_sizes: Dict[str, int],
     num_epochs: int = 25,
     verbose: int = 1,
 ) -> nn.Module:
@@ -462,7 +467,7 @@ def train_model(
     return model
 
 
-def _construct_TL_network(dataset: str, model_type: Optional[str]) -> nn.Module:
+def _construct_tl_network(dataset: str, model_type: Optional[str]) -> nn.Module:
     """
     Modifies the pretrained PyTorch neural network for transfer learning.
 
@@ -526,7 +531,7 @@ def normalize_data(data: torch.Tensor) -> torch.Tensor:
     return (data - torch.min(data)) / (torch.max(data) - torch.min(data))
 
 
-def _get_knn_data(dataset: str) -> tuple[np.ndarray, np.ndarray]:
+def _get_knn_data(dataset: str) -> Tuple[np.ndarray, np.ndarray]:
     """Helper function to load knn_data for pretrained CNNVAEs"""
     knn_ind = np.load("knn_data/" + dataset + "_knn_ind.npy")
     knn_dist = np.load("knn_data/" + dataset + "_knn_dist.npy")
@@ -591,8 +596,7 @@ def encode_pretrained(
 
     # Load data
     data, _ = load_dataset(dataset)
-    torch_data = normalize_data(torch.from_numpy(data).float())
-    # data = data.to(device)
+    torch_data = normalize_data(torch.from_numpy(data).float()).to(device)
 
     torch_data = torch_data.expand([-1, 3, -1, -1])
 
@@ -603,10 +607,9 @@ def encode_pretrained(
         torch_data = transform(data)
 
     encoded_data = np.array([])
-    models_dict = PYTORCH_NEURAL_NETWORKS_DICT.copy()
     # Load the desired model and encode data
     if model_type in PYTORCH_NEURAL_NETWORKS:
-        model_used = models_dict.get(model_type)
+        model_used = PYTORCH_NEURAL_NETWORKS_DICT.get(model_type)
         model = torch.hub.load("pytorch/vision:v0.10.0", model_used, pretrained=True)
         model.to(device)
         model.eval()
@@ -647,11 +650,11 @@ def encode_transfer_learning(
     transfer_batch_size: int = TL_BATCH_SIZE,
     batch_size: int = ENCODING_BATCH_SIZE,
     data_info: Optional[
-        tuple[torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor]
+        Tuple[torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor]
     ] = None,
     data_augmentation: bool = False,
     hardware_acceleration: bool = False,
-) -> tuple[np.ndarray, np.ndarray]:
+) -> Tuple[np.ndarray, np.ndarray]:
     # Decide which device to use
     device = torch.device(
         _determine_hardware(hardware_acceleration=hardware_acceleration)
@@ -673,13 +676,19 @@ def encode_transfer_learning(
         else:
             data_train, label_train, data_test, label_test = data_info
 
-        # Modify data
-        data_train = data_train.expand([-1, 3, -1, -1])
-        data_test = data_test.expand([-1, 3, -1, -1])
+        # Put data on the device
+        data_train = data_train.to(device)
+        label_train = label_train.to(device)
+        data_test = data_test.to(device)
+        label_test = label_test.to(device)
 
+        # Modify data
         with torch.no_grad():
             data_train = normalize_data(data_train)
             data_test = normalize_data(data_test)
+
+            data_train = data_train.expand([-1, 3, -1, -1])
+            data_test = data_test.expand([-1, 3, -1, -1])
 
         if data_augmentation:
             data_transforms = {
@@ -722,7 +731,7 @@ def encode_transfer_learning(
         dataloaders = {"train": dataloader_train, "val": dataloader_val}
         dataset_sizes = {"train": train_size, "val": val_size}
 
-        model_ft = _construct_TL_network(dataset, model_type)
+        model_ft = _construct_tl_network(dataset, model_type)
         model_ft.to(device)
 
         # Set up the optimizer to optimize all model parameters
@@ -744,13 +753,9 @@ def encode_transfer_learning(
         )
 
         data, _ = load_dataset(dataset)
-        torch_data = torch.from_numpy(data).float()
+        torch_data = normalize_data(torch.from_numpy(data).float()).to(device)
 
         torch_data = torch_data.expand([-1, 3, -1, -1])
-        torch_data = normalize_data(torch_data)
-
-        torch_data = torch_data.to(device)
-        # model_ft.cpu()
         model_ft.eval()
 
         if model_type is None:
@@ -868,3 +873,19 @@ def _polar_transform_mstar(mag, phase):
     data = np.stack((mag, real, imaginary), axis=1)
 
     return data
+
+
+def gen_checkerboard_3(num_samples=500, randseed=123):
+    np.random.seed(randseed)
+    X = np.random.rand(num_samples, 2)
+    labels = np.mod(np.floor(X[:, 0] * 3) + np.floor(X[:, 1] * 3), 3).astype(np.int64)
+
+    return X, labels
+
+
+def gen_stripe_3(num_samples=500, width=1 / 3, randseed=123):
+    np.random.seed(randseed)
+    X = np.random.rand(num_samples, 2)
+    labels = np.mod(np.floor(X[:, 0] / width + X[:, 1] / width), 3).astype(np.int64)
+
+    return X, labels

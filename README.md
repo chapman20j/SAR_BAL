@@ -27,6 +27,7 @@ annoy
 3. Python Files
     a. utils: Contains constants, code for loading datasets, and code for embedding them. 
     b. batch\_active\_learning: Contains constants, code for DAC, and code for active learning
+    d. experiments: 
     c. models: 
 4. Folders
     a. BAL Examples
@@ -36,6 +37,9 @@ annoy
     e. Images
     f. knn\_data
     g. models
+5. Other
+    a. Plots with Percentages: Plots the data from experiments 1 and 2 nicely
+    b. CNNVAE knn data: Computes the knn data for each trained cnnvae used
 
 ## Include others
 
