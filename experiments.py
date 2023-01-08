@@ -30,9 +30,14 @@ EXPERIMENT_3_NUM_EXPERIMENTS = 20
 def experiment_1(dataset: str, hardware_acceleration: bool):
     assert dataset in utils.AVAILABLE_SAR_DATASETS, "Invalid dataset"
 
-    X, labels, knn_data, initial = utils.zero_shot_tl(
-        dataset, hardware_acceleration=hardware_acceleration
-    )
+    if dataset == "mstar":
+        X, labels, knn_data, initial = utils.cnnvae(
+            dataset, hardware_acceleration=hardware_acceleration
+        )
+    else:
+        X, labels, knn_data, initial = utils.zero_shot_tl(
+            dataset, hardware_acceleration=hardware_acceleration
+        )
 
     # Create graph objects
     W = gl.weightmatrix.knn(X, utils.KNN_NUM, kernel="gaussian", knn_data=knn_data)
