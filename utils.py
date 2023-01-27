@@ -643,6 +643,7 @@ def encode_pretrained(
     return encoded_data
 
 
+# NOTE: Changed random resized crop(224) to resize then center crop.
 def encode_transfer_learning(
     dataset: str,
     model_type: Optional[str] = None,
@@ -694,7 +695,8 @@ def encode_transfer_learning(
             data_transforms = {
                 "train": transforms.Compose(
                     [
-                        transforms.RandomResizedCrop(224),
+                        transforms.Resize(256),
+                        transforms.CenterCrop(224),
                         transforms.RandomRotation(degrees=(0, 180)),
                         transforms.GaussianBlur(kernel_size=(1, 1), sigma=(1, 1)),
                         transforms.ColorJitter(contrast=2, brightness=0.5, hue=0.3),
