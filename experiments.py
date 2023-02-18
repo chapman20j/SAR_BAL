@@ -1,8 +1,25 @@
 # experiments.py
 """
-DOCSTRING
+This file contains the experiments that are run for the paper. The purpose of doing
+    this is to keep experiment details (parameters, etc.) consistent across the
+    different experiments.
+
+experiment_1
+    Corresponds to table 2 and figure 6 in the paper
+    Corresponds to Experiment 1: Various Active Learning method.ipynb
+
+experiment_2
+    Corresponds to figure 7 in the paper
+    Corresponds to Experiment 2: LocalMax Acquisition Functions.ipynb
+
+experiment_3
+    Corresponds to table 3 in the paper
+    Corresponds to Experiment 3: Variance.ipynb
+
+experiment_4
+    Corresponds to table 4 in the paper
+    Corresponds to Experiment 4: Architecture Tests.ipynb
 """
-# TODO: Add all the docstrings in this file
 
 import numpy as np
 import pandas as pd
@@ -28,6 +45,18 @@ EXPERIMENT_3_NUM_EXPERIMENTS = 20
 
 
 def experiment_1(dataset: str, hardware_acceleration: bool):
+    """
+    Runs experiment 1
+
+    :param dataset: dataset to test
+    :param hardware_acceleration: use GPU if true
+
+    :return:
+        acc_dict: final accuracy for each experiment
+        time_dict: time used for each experiment
+        num_labels_dict: number of labels used at each step for each experiment
+        full_acc_dict: accuracy at each iteration for each experiment
+    """
     assert dataset in utils.AVAILABLE_SAR_DATASETS, "Invalid dataset"
 
     if dataset == "mstar":
@@ -83,6 +112,7 @@ def experiment_1(dataset: str, hardware_acceleration: bool):
 
 
 def experiment_1_simple_plotter(x_dict, y_dict, dataset, include_sota=False):
+    """Simple plotting function for experiment 1. Plots all curves in figure."""
 
     for ind, this_key in enumerate(bal.AL_METHODS):
         plt.plot(x_dict[this_key], y_dict[this_key], label=bal.AL_METHOD_NAMES[ind])
@@ -121,6 +151,7 @@ def experiment_1_simple_plotter(x_dict, y_dict, dataset, include_sota=False):
 def experiment_1_full_save(
     acc_dict, time_dict, num_labels_dict, full_acc_dict, dataset
 ):
+    """Saves all the outputs from experiment 1"""
     new_save_path = EXPERIMENT_1_SAVE_PATH + "Pickles/" + dataset
     print("Saving to: " + EXPERIMENT_1_SAVE_PATH + "Pickles/")
 
@@ -144,6 +175,7 @@ def experiment_1_full_save(
 
 
 def experiment_2_simple_plotter(x_dict, y_dict, dataset):
+    """Simple plotting function for experiment 2. Plots all curves in figure."""
     _, ax1 = plt.subplots()
 
     ax1.set_xlabel("Number of Labeled Points")
@@ -170,7 +202,18 @@ def experiment_2_simple_plotter(x_dict, y_dict, dataset):
     return
 
 
-def experiment_2(dataset, embedding, hardware_acceleration):
+def experiment_2(dataset: str, embedding: str, hardware_acceleration: bool):
+    """
+    Runs experiment 2
+
+    :param dataset: dataset to test
+    :param embedding: embedding to test
+    :param hardware_acceleration: use GPU if true
+
+    :return:
+        num_labels_dict: dictionary containing arrays of number of labels used.
+        acc_dict: dictionary containing array of accuracy.
+    """
     assert dataset in utils.AVAILABLE_SAR_DATASETS, "Invalid dataset"
     assert embedding in utils.AVAILABLE_EMBEDDINGS, "Invalid embedding"
 
@@ -241,12 +284,29 @@ def experiment_2(dataset, embedding, hardware_acceleration):
 
 
 def experiment_3(
-    dataset,
-    embedding,
-    data_augmentation,
-    num_experiments=EXPERIMENT_3_NUM_EXPERIMENTS,
-    hardware_acceleration=False,
+    dataset: str,
+    embedding: str,
+    data_augmentation: bool,
+    num_experiments: int = EXPERIMENT_3_NUM_EXPERIMENTS,
+    hardware_acceleration: bool = False,
 ):
+    """
+    Runs experiment 3
+
+    :param dataset: dataset to test
+    :param embedding: embedding to test
+    :param data_augmentation: use data augmentation if true
+    :param num_experiments: number of experiment to run
+    :param hardware_acceleration: use GPU if true
+
+    :return: dictionary containing statistics about the experiment
+        "num_points": labels used by end of experiment
+        "experiments": num_experiments
+        "mean": mean accuracy
+        "std_dev": standard deviation of accuracy
+        "max": max accuracy
+        "data": accuracy data
+    """
     assert dataset in utils.AVAILABLE_SAR_DATASETS, "Invalid dataset"
     assert dataset != "mstar", "Invalid dataset: not testing MSTAR"
     assert embedding in utils.AVAILABLE_EMBEDDINGS, "Invalid embedding"
@@ -315,9 +375,17 @@ def experiment_3(
 ## Experiment 4 Functions
 
 
-# Does this use data augmentation? I believe so
-# Zero-shot TL
 def experiment_4(dataset, network, hardware_acceleration):
+    """
+    Runs experiment 4
+
+    :param dataset: dataset to test
+    :param network: neural network to use
+        refer to utils.PYTORCH_NEURAL_NETWORKS for full list
+    :param hardware_acceleration: use GPU if true
+
+    :return: final accuracy
+    """
     assert dataset in utils.AVAILABLE_SAR_DATASETS, "Invalid dataset"
     assert dataset != "mstar", "Invalid dataset: not testing MSTAR"
     assert network in utils.PYTORCH_NEURAL_NETWORKS, "Invalid Neural Network"

@@ -26,27 +26,6 @@ from scipy.sparse import csr_matrix
 import utils
 
 
-# TODO: Function comments
-# Please include the exact python type
-# Complex functions. Refer to density_determine_rad for an example
-# """
-# Function description
-#
-# :param p1: description
-#     additional details if necessary
-# :param p2: description
-# ...
-# :param pn: description
-#
-# :return:
-#     variable 1: description
-#     variable 2: description
-# """
-
-# Simple functions.
-# """Quick function description"""
-
-
 ################################################################################
 ## Default Parameters
 
@@ -160,15 +139,19 @@ def coreset_dijkstras(
 
     :param G: Graph object
     :param rad: fixed radius to use in DAC method
-    :param data:
+    :param data: embedded data
     :param initial: Initial points in coreset
     :param density_info:
-    :param similarity:
-    :param knn_data:
-    :param plot_steps:
+        boolean to decide whether to use density radius
+        float to determine the density radius
+        initial spatial radius to try in density_determine_rad
+    :param similarity: similarity metric to use.
+        Refer to gl.weightmatrix.knn for supported inputs
+    :param knn_data: precomputed knn_data
+    :param plot_steps: plots all stages of the algorithm
+        uses first two dimensions of data for plotting
 
     :return: coreset computed from DAC
-
     """
 
     perim: List[int] = []
@@ -199,7 +182,6 @@ def coreset_dijkstras(
     graph_raw_dist = gl.graph(w_dist)
 
     # Construct the perimeter from the initial set
-    # num_init = len(initial)
     for node in initial:
         if use_density:
             rad_low = density_determine_rad(graph_raw_dist, node, proportion / 2.0, r_0)
@@ -372,17 +354,18 @@ def local_maxes_k_new(
 ) -> np.ndarray:
     """
     Function to compute the k local maxes of the acquisition function.
+        acq_array(v) >= acq_array(u) for all u in neighbors, then v is a local max
 
-    :param knn_ind:
-    :param acq_array:
-    :param k:
-    :param top_num:
-    :param thresh:
+    :param knn_ind: indices for k-nearest neighbors of each point
+    :param acq_array: computed acquisition values for each point
+    :param k: the number of neighbors to include in local_max calculation
+    :param top_num: the number of local maxes to include
+    :param thresh: the minimum acquisition value allowable to select a point
 
-    :return:
+    :return: array of indices for local maxes
     """
     # Look at the k nearest neighbors
-    # If weights(v) >= weights(u) for all u in neighbors, then v is a local max
+    #
     local_maxes = np.array([])
     K = knn_ind.shape[1]
     if k > K or k == -1:
@@ -409,9 +392,13 @@ def local_maxes_k_new(
 
 def random_sample_val(val: np.ndarray, sample_num: int) -> np.ndarray:
     """
-    Docstring
+    Turns val into a probability array and samples points from it.
+
+    :param val: initial weights (typically acquisition values)
+    :param sample_num: number of points to sample
+
+    :return: the indices to sample
     """
-    # assert not np.any(val < -1e-2), "random_sample_val: negative values aren't allowed"
     # Give all points some probability
     min_tol = 1.0 / len(val)
     val += min_tol - np.min(val)
@@ -420,8 +407,9 @@ def random_sample_val(val: np.ndarray, sample_num: int) -> np.ndarray:
 
 
 ################################################################################
-
 ## implement batch active learning function
+
+
 def batch_active_learning_experiment(
     X: np.ndarray,
     labels: np.ndarray,
@@ -444,17 +432,47 @@ def batch_active_learning_experiment(
     thresholding: int = 0,
 ) -> BALOutputType:
     """
-    Function to run batch active learning
+    Function to run batch active learning experiments
 
-    **LIST ALL PARAMS
+    :param X: embedded data
+    :param labels: labels for data
+    :param W: weight matrix for the graph
+    :param coreset: list of points in the coreset
+    :param new_samples: total number of points to label
+    :param al_mtd: active learning method
+        "local_max": local max method
+        "global_max": sequential active learning
+        "acq_sample": sample proportional to acq(x)^q
+        "random": random sampling
+        "topn_max": batchsize points with highest acquisition values
+    :param acq_fun: acquisition function to use
+        "mc": model change
+        "vopt": variance optimality
+        "uc": uncertainty
+        "mcvopt": mc + vopt
+        refer to paper for citations
+        refer to graphlearning library for implementations
+    :param knn_data: precomputed knn data. If None, this function computes it.
+    :param display_all_times: prints detailed time taken if true
+    :param method: graph learning method to use
+        "Laplace": laplace learning
+        "rw_Laplace": reweighted laplace learning
+        "Poisson": poisson learning
+    :param use_prior: whether to use priors in graph learning method
+    :param display: whether to display plots
+    :param savefig: whether to save figures
+    :param savefig_folder: where to save figures
+    :param batchsize: batchsize used
+    :param dist_metric: distance metric for embedded data
+    :param knn_size: node degree in k-nearest neighbors graph
+    :param q: weighting for acq_sample
+    :param thresholding: minimum acquisition value to accept
 
     :return:
-
-
-    This was from previous docstring
-    al_mtd: 'local_max', 'global_max', 'rs_kmeans', 'gd_kmeans', 'acq_sample',
-        'greedy_batch', 'particle', 'random', 'topn_max'
-
+        final list of labeled points
+        number of labels at each iteration
+        model accuracy at each iteration
+        total time taken (only valid if display == False)
     """
 
     if knn_data:
@@ -463,7 +481,6 @@ def batch_active_learning_experiment(
         knn_ind, _ = gl.weightmatrix.knnsearch(
             X, knn_size, method="annoy", similarity=dist_metric
         )
-        # knn_ind, knn_dist = knn_data
 
     if al_mtd == "local_max":
         k, thresh = -1, 0
