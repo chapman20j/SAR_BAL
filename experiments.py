@@ -392,7 +392,7 @@ def experiment_4(dataset, network, hardware_acceleration):
 
     # Zero-Shot TL
     X, labels, knn_data, initial = utils.zero_shot_tl(
-        dataset, hardware_acceleration=hardware_acceleration
+        dataset, hardware_acceleration=hardware_acceleration, network=network
     )
 
     # Create graph objects

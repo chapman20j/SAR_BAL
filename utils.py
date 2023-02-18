@@ -3,12 +3,14 @@
 Authors: James, Bohan, and Zheng
 
 This utils file contains useful code for loading and embedding the MSTAR,
-OpenSARShip, and FUSAR-Ship datasets.  This code handles all the training
-for neural networks also. The available embeddings are:
-    CNNVAE:         uses a pretrained cnnvae to embed the data
-    zero_shot_tl:   uses zero shot transfer learning
-    fine_tuned_tl:  uses fine tuned transfer learning
-The beginning of the code also contains constant which are used throughout the project.
+    OpenSARShip, and FUSAR-Ship datasets.  This code handles all the training
+    for neural networks also. The available embeddings are:
+        CNNVAE:         uses a pretrained cnnvae to embed the data
+        zero_shot_tl:   uses zero shot transfer learning
+        fine_tuned_tl:  uses fine tuned transfer learning
+
+The beginning of the code also contains constant which are used for various
+    datasets and embeddings.
 """
 import os
 import time
@@ -81,6 +83,7 @@ DEFAULT_NEURAL_NETWORKS_DICT: Dict[str, str] = {
 
 
 ################################################################################
+## Types
 ArrayType = Union[torch.Tensor, np.ndarray]
 EmbeddingType = Tuple[np.ndarray, np.ndarray, Tuple[np.ndarray, np.ndarray], np.ndarray]
 
@@ -102,14 +105,15 @@ def cnnvae(
     """
     Embeds the chosen dataset using a trained CNNVAE.
 
-    :param dataset:
+    :param dataset: dataset to use
+    :param knn_num: node degree in knn graph
+    :param hardward_acceleration: use GPU if true
 
     :return:
-        data - the encoded data
-        labels - the labels
-        knn_data - the knn_data computed with annoy algorithm from the encoded data
-        train_ind - this is just a point from each class.
-            These are used later for coreset construction
+        data: the encoded data
+        labels: the labels
+        knn_data: the knn_data computed with annoy algorithm from the encoded data
+        train_ind: a point from each class. Used later for coreset construction
     """
     assert dataset in AVAILABLE_SAR_DATASETS, "Invalid Dataset"
 
@@ -157,17 +161,34 @@ def zero_shot_tl(
     dataset: str,
     knn_num: int = KNN_NUM,
     hardware_acceleration: bool = False,
+    network: Optional[str] = None,
 ) -> EmbeddingType:
     """
-    Docstring
+    Embeds the chosen dataset using zero-shot transfer learning.
+
+    :param dataset: dataset to use
+    :param knn_num: node degree in knn graph
+    :param hardward_acceleration: use GPU if true
+    :param network: which network to use
+
+    :return:
+        data: the encoded data
+        labels: the labels
+        knn_data: the knn_data computed with annoy algorithm from the encoded data
+        train_ind: a point from each class. Used later for coreset construction
     """
     assert dataset in AVAILABLE_SAR_DATASETS, "Invalid Dataset"
 
     _, labels = load_dataset(dataset)
 
+    if network is None:
+        network = DEFAULT_NEURAL_NETWORKS_DICT[dataset]
+    else:
+        assert network in PYTORCH_NEURAL_NETWORKS
+
     data = encode_pretrained(
         dataset,
-        DEFAULT_NEURAL_NETWORKS_DICT[dataset],
+        network,
         hardware_acceleration=hardware_acceleration,
     )
 
@@ -194,7 +215,20 @@ def fine_tuned_tl(
     hardware_acceleration: bool = False,
 ) -> EmbeddingType:
     """
-    Docstring
+    Embeds the chosen dataset using fine-tuned transfer learning.
+
+    :param dataset: dataset to use
+    :param knn_num: node degree in knn graph
+    :param num_epochs: number of epochs for fine-tuning
+    :param network: neural network to use in embedding
+    :param data_augmentation: use data augmentation if true
+    :param hardward_acceleration: use GPU if true
+
+    :return:
+        data: the encoded data
+        labels: the labels
+        knn_data: the knn_data computed with annoy algorithm from the encoded data
+        train_ind: a point from each class. Used later for coreset construction
     """
     assert dataset in AVAILABLE_SAR_DATASETS, "Invalid Dataset"
 
@@ -229,9 +263,7 @@ def fine_tuned_tl(
 def load_dataset(
     dataset: str,
 ) -> Tuple[np.ndarray, np.ndarray]:
-    """
-    Docstring
-    """
+    """Loads the desired dataset with labels"""
     if dataset == "open_sar_ship":
         data_train = np.load("data/OpenSARShip/SarTrainImages.npz")["arr_0"]
         target_train = np.load("data/OpenSARShip/SarTrainLabels.npy")
@@ -252,10 +284,6 @@ def load_dataset(
     if dataset != "mstar":
         data = np.vstack((data_train, data_test))
         target = np.hstack((target_train, target_test))
-
-    # if return_torch:
-    #    data = torch.from_numpy(data).float()
-    #    target = torch.from_numpy(target).long()
 
     return data, target
 
@@ -313,7 +341,6 @@ def load_dataset_fine_tuned_tl(
 ## Helper Functions / Classes
 
 
-# MARK: Used in the encode_pretrained
 def _determine_feature_layer(model_type: str) -> str:
     """Determines the feature layer based on the model type."""
     if model_type == "ShuffleNet":
@@ -354,7 +381,6 @@ class MyDataset(Dataset):
         return len(self.data)
 
 
-# TODO: Add types here
 def train_model(
     model: nn.Module,
     criterion,
@@ -366,26 +392,7 @@ def train_model(
     num_epochs: int = 25,
     verbose: int = 1,
 ) -> nn.Module:
-    """
-    Helper function for transfer learning. Fine tunes the pretrained model.
-
-    FINISH THIS
-
-    :param model:
-    :param criterion:
-    :param optimizer:
-    :param scheduler:
-    :param device:
-    :param dataloaders:
-    :param dataset_sizes:
-    :param num_epochs:
-    :param verbose: determines the amount of printing done
-        0 gives no printing
-        1 gives just the epoch
-        2 gives full output
-
-    :return:
-    """
+    """Helper function for transfer learning. Fine tunes the pretrained model."""
     since = time.time()
     assert verbose in [0, 1, 2]
 
@@ -541,16 +548,14 @@ def _get_knn_data(dataset: str) -> Tuple[np.ndarray, np.ndarray]:
 ################################################################################
 ## Encoding/Transfer Learning Functions
 
-# This was efficient
+
 def encode_dataset(
     dataset: str,
     model_path: str,
     batch_size: int = ENCODING_BATCH_SIZE,
     hardware_acceleration: bool = False,
 ) -> np.ndarray:
-    """
-    Docstring
-    """
+    """Implements CNNVAE embedding"""
     # Decide which device to use
     device = torch.device(
         _determine_hardware(hardware_acceleration=hardware_acceleration)
@@ -586,6 +591,7 @@ def encode_pretrained(
     batch_size: int = ENCODING_BATCH_SIZE,
     hardware_acceleration: bool = False,
 ) -> np.ndarray:
+    """Implements zero-shot transfer learning"""
     # Decide which device to use
     device = torch.device(
         _determine_hardware(hardware_acceleration=hardware_acceleration)
@@ -643,7 +649,6 @@ def encode_pretrained(
     return encoded_data
 
 
-# NOTE: Changed random resized crop(224) to resize then center crop.
 def encode_transfer_learning(
     dataset: str,
     model_type: Optional[str] = None,
@@ -656,6 +661,7 @@ def encode_transfer_learning(
     data_augmentation: bool = False,
     hardware_acceleration: bool = False,
 ) -> Tuple[np.ndarray, np.ndarray]:
+    """Implements fine-tuned transfer learning"""
     # Decide which device to use
     device = torch.device(
         _determine_hardware(hardware_acceleration=hardware_acceleration)
@@ -878,6 +884,7 @@ def _polar_transform_mstar(mag, phase):
 
 
 def gen_checkerboard_3(num_samples=500, randseed=123):
+    """Checkerboard 3 dataset"""
     np.random.seed(randseed)
     X = np.random.rand(num_samples, 2)
     labels = np.mod(np.floor(X[:, 0] * 3) + np.floor(X[:, 1] * 3), 3).astype(np.int64)
@@ -886,6 +893,7 @@ def gen_checkerboard_3(num_samples=500, randseed=123):
 
 
 def gen_stripe_3(num_samples=500, width=1 / 3, randseed=123):
+    """Stripe 3 dataset"""
     np.random.seed(randseed)
     X = np.random.rand(num_samples, 2)
     labels = np.mod(np.floor(X[:, 0] / width + X[:, 1] / width), 3).astype(np.int64)

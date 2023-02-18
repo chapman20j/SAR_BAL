@@ -2,7 +2,7 @@
 """
 Authors: James, Bohan, and Zheng
 
-Some functions for doing batch active learning and coreset selection
+Functions for doing batch active learning and coreset selection
 
 Finish docstring
 """
