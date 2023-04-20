@@ -805,6 +805,7 @@ def encode_transfer_learning(
 ################################################################################
 ## MSTAR Helper Functions
 # All code below is from MSTAR Github
+# jwcalder MSTAR-Active-Learning
 
 
 def _load_mstar(root_dir="./data/MSTAR"):

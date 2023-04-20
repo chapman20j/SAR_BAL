@@ -454,8 +454,6 @@ def batch_active_learning_experiment(
             "vopt": Variance optimality.
             "uc": Uncertainty.
             "mcvopt": MC + VOPT.
-            Refer to paper for citations.
-            Refer to graphlearning library for implementations.
         knn_data: Precomputed knn data. Defaults to None.
         display_all_times: Prints more detailed time consumption.
         method: Graph learning method to use.
