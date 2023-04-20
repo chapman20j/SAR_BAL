@@ -3,10 +3,7 @@
 Authors: James, Bohan, and Zheng
 
 Functions for doing batch active learning and coreset selection
-
-Finish docstring
 """
-# TODO: This is mostly done with comments
 
 import timeit
 import os
@@ -62,20 +59,21 @@ def density_determine_rad(
     r_0: float = 1.0,
     tol: float = 0.02,
 ) -> float:
-    """
-    Returns the radius, 'r', required for B_r(x) to contain a fixed proportion,
+    """Returns the radius, 'r', required for B_r(x) to contain a fixed proportion,
         'proportion', of the nodes in the graph. This uses the bisection method
         and more efficient code could be written in c. Starts by picking
         boundary points for the bisection method. The final radius will satisfy
             -tol <= |B_r(x)| / |V(G)| - proportion <= tol
 
-    :param G: Graph object
-    :param x: Node index
-    :param proportion: Proportion of data desired in B_r(x)
-    :param r_0: Initial radius to try for bisection method.
-    :param tol: Allowable error tolerance in proportion calculation
+    Args:
+        graph: Graph object.
+        node: Node index.
+        proportion: Proportion of data desired in B_r(x).
+        r_0: Initial radius to try for bisection method. Defaults to 1.0.
+        tol: Allowable error tolerance in proportion calculation. Defaults to 0.02.
 
-    :return: Radius r
+    Returns:
+        Radius r
     """
 
     num_nodes = graph.num_nodes
@@ -131,27 +129,33 @@ def coreset_dijkstras(
     knn_data: Optional[Tuple[np.ndarray, np.ndarray]] = None,
     plot_steps: bool = False,
 ) -> List[int]:
-    """
-    Runs the Dijkstra's Annulus Coreset (DAC) method outlined in the paper. The
+    """Runs the Dijkstra's Annulus Coreset (DAC) method outlined in the paper. The
         algorithm uses inner radius which is half of rad. When using density
         radius, the inner radius makes half the proportion of data lie in that
         ball.
 
-    :param G: Graph object
-    :param rad: fixed radius to use in DAC method
-    :param data: embedded data
-    :param initial: Initial points in coreset
-    :param density_info:
-        boolean to decide whether to use density radius
-        float to determine the density radius
-        initial spatial radius to try in density_determine_rad
-    :param similarity: similarity metric to use.
-        Refer to gl.weightmatrix.knn for supported inputs
-    :param knn_data: precomputed knn_data
-    :param plot_steps: plots all stages of the algorithm
-        uses first two dimensions of data for plotting
+    Args:
+        graph: Graph object.
+        rad: Fixed radius to use in DAC method.
+        data: Embedded data. Defaults to None.
+        initial: Initial points in coreset. Defaults to None.
+        density_info:
+            Boolean to decide whether to use density radius.
+            Float to determine the density radius.
+            Initial spatial radius to try in density_determine_rad.
+            Defaults to (False, DENSITY_RADIUS, 1.0).
+        similarity:
+            Similarity metric to use.
+            Refer to gl.weightmatrix.knn for supported inputs.
+            Defaults to "euclidean".
+        knn_data: Precomputed knn_data. Defaults to None.
+        plot_steps:
+            Plots all stages of the algorithm.
+            Uses first two dimensions of data for plotting.
+            Defaults to False.
 
-    :return: coreset computed from DAC
+    Returns:
+        Coreset computed from DAC
     """
 
     perim: List[int] = []
@@ -294,19 +298,17 @@ def coreset_dijkstras(
 def _dac_plot_fun(
     data: np.ndarray, points_seen: np.ndarray, coreset: List[int], perim: List[int]
 ) -> None:
-    """
-    Function for plotting the steps of the DAC algorithm. It first checks if
+    """Function for plotting the steps of the DAC algorithm. It first checks if
         the dataset is from a square. This indicates that it will use the
         parameters to make nice plots for figures in the paper (eg. larger
         red dots). If it is the square dataset, the plots are saved. The plots
         are always displayed when this function is called.
 
-    :param data: Raw data. Each datapoint must be in 2 dimensions
-    :param points_seen: Points which have already been seen.
-    :param coreset: Points contained in the coreset
-    :param perim: Points in the perimeter
-
-    :return: None
+    Args:
+        data: Raw data. Each datapoint must be in 2 dimensions.
+        points_seen: Points which have already been seen.
+        coreset: Points contained in the coreset.
+        perim: Points in the perimeter.
     """
     unit_x_len = np.abs(np.max(data[:, 0]) - np.min(data[:, 0]) - 1) < 0.05
     unit_y_len = np.abs(np.max(data[:, 1]) - np.min(data[:, 1]) - 1) < 0.05
@@ -352,20 +354,20 @@ def local_maxes_k_new(
     top_num: int,
     thresh: int = 0,
 ) -> np.ndarray:
-    """
-    Function to compute the k local maxes of the acquisition function.
+    """Function to compute the k local maxes of the acquisition function.
         acq_array(v) >= acq_array(u) for all u in neighbors, then v is a local max
 
-    :param knn_ind: indices for k-nearest neighbors of each point
-    :param acq_array: computed acquisition values for each point
-    :param k: the number of neighbors to include in local_max calculation
-    :param top_num: the number of local maxes to include
-    :param thresh: the minimum acquisition value allowable to select a point
+    Args:
+        knn_ind: Indices for k-nearest neighbors of each point.
+    acq_array: Computed acquisition values for each point.
+        k: The number of neighbors to include in local_max calculation.
+        top_num: The number of local maxes to include.
+        thresh: The minimum acquisition value allowable to select a point. Defaults to 0.
 
-    :return: array of indices for local maxes
+    Returns:
+        Array of indices for local maxes.
     """
     # Look at the k nearest neighbors
-    #
     local_maxes = np.array([])
     K = knn_ind.shape[1]
     if k > K or k == -1:
@@ -391,13 +393,14 @@ def local_maxes_k_new(
 
 
 def random_sample_val(val: np.ndarray, sample_num: int) -> np.ndarray:
-    """
-    Turns val into a probability array and samples points from it.
+    """Turns val into a probability array and samples points from it.
 
-    :param val: initial weights (typically acquisition values)
-    :param sample_num: number of points to sample
+    Args:
+        val: Initial weights (typically acquisition values).
+        sample_num: Number of points to sample.
 
-    :return: the indices to sample
+    Returns:
+        Indices to sample.
     """
     # Give all points some probability
     min_tol = 1.0 / len(val)
@@ -419,7 +422,7 @@ def batch_active_learning_experiment(
     al_mtd: str,
     acq_fun: str,
     knn_data: Optional[Tuple[np.ndarray, np.ndarray]] = None,
-    display_all_times: bool = False,  # The following parameters aren't changed in experiments
+    display_all_times: bool = False,
     method: str = "Laplace",
     use_prior: bool = False,
     display: bool = False,
@@ -431,48 +434,49 @@ def batch_active_learning_experiment(
     q: int = 1,
     thresholding: int = 0,
 ) -> BALOutputType:
-    """
-    Function to run batch active learning experiments
+    """Function to run batch active learning experiments. Parameters starting with
+        display_all_times are not changed in the experiments.
 
-    :param X: embedded data
-    :param labels: labels for data
-    :param W: weight matrix for the graph
-    :param coreset: list of points in the coreset
-    :param new_samples: total number of points to label
-    :param al_mtd: active learning method
-        "local_max": local max method
-        "global_max": sequential active learning
-        "acq_sample": sample proportional to acq(x)^q
-        "random": random sampling
-        "topn_max": batchsize points with highest acquisition values
-    :param acq_fun: acquisition function to use
-        "mc": model change
-        "vopt": variance optimality
-        "uc": uncertainty
-        "mcvopt": mc + vopt
-        refer to paper for citations
-        refer to graphlearning library for implementations
-    :param knn_data: precomputed knn data. If None, this function computes it.
-    :param display_all_times: prints detailed time taken if true
-    :param method: graph learning method to use
-        "Laplace": laplace learning
-        "rw_Laplace": reweighted laplace learning
-        "Poisson": poisson learning
-    :param use_prior: whether to use priors in graph learning method
-    :param display: whether to display plots
-    :param savefig: whether to save figures
-    :param savefig_folder: where to save figures
-    :param batchsize: batchsize used
-    :param dist_metric: distance metric for embedded data
-    :param knn_size: node degree in k-nearest neighbors graph
-    :param q: weighting for acq_sample
-    :param thresholding: minimum acquisition value to accept
+    Args:
+        X: Embedded data. Defaults to None.
+        labels: Labels for data.
+        W: Weight matrix for the graph.
+        coreset: List of points in the coreset.
+        new_samples: Total number of points to label.
+        al_mtd: Active learning method.
+            "local_max": Local max method.
+            "global_max": Sequential active learning.
+            "acq_sample": Sample proportional to acq(x)^q.
+            "random": Random sampling.
+            "topn_max": Batchsize points with highest acquisition values.
+        acq_fun: Acquisition function to use.
+            "mc": Model change.
+            "vopt": Variance optimality.
+            "uc": Uncertainty.
+            "mcvopt": MC + VOPT.
+            Refer to paper for citations.
+            Refer to graphlearning library for implementations.
+        knn_data: Precomputed knn data. Defaults to None.
+        display_all_times: Prints more detailed time consumption.
+        method: Graph learning method to use.
+            "Laplace": laplace learning
+            "rw_Laplace": reweighted laplace learning
+            "Poisson": poisson learning
+        use_prior: Use priors in graph learning method if true. Defaults to False.
+        display: Display plots if true. Defaults to False.
+        savefig: Save figures if true. Defaults to False.
+        savefig_folder: Location to save figures. Defaults to "../BAL_figures".
+        batchsize: Batch size used. Defaults to BATCH_SIZE.
+        dist_metric: Distance metric for embedded data. Defaults to "angular".
+        knn_size: Node degree in k-nearest neighbors graph. Defaults to utils.KNN_NUM.
+        q: Weighting for acq_sample. Defaults to 1.
+        thresholding: Minimum acquisition value to accept. Defaults to 0.
 
-    :return:
-        final list of labeled points
-        number of labels at each iteration
-        model accuracy at each iteration
-        total time taken (only valid if display == False)
+    Returns:
+        Final list of labeled points.
+        Number of labels at each iteration.
+        Model accuracy at each iteration.
+        Total time taken (only valid if display == False).
     """
 
     if knn_data:

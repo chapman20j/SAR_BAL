@@ -45,18 +45,19 @@ EXPERIMENT_3_NUM_EXPERIMENTS = 20
 
 
 def experiment_1(dataset: str, hardware_acceleration: bool):
-    """
-    Runs experiment 1
+    """Runs experiment 1
 
-    :param dataset: dataset to test
-    :param hardware_acceleration: use GPU if true
+    Args:
+        dataset: Dataset to test.
+        hardware_acceleration: Use GPU if true.
 
-    :return:
-        acc_dict: final accuracy for each experiment
-        time_dict: time used for each experiment
-        num_labels_dict: number of labels used at each step for each experiment
-        full_acc_dict: accuracy at each iteration for each experiment
+    Returns:
+        acc_dict: Final accuracy for each experiment.
+        time_dict: Time used for each experiment.
+        num_labels_dict: Number of labels used at each step for each experiment.
+        full_acc_dict: Accuracy at each iteration for each experiment.
     """
+
     assert dataset in utils.AVAILABLE_SAR_DATASETS, "Invalid dataset"
 
     if dataset == "mstar":
@@ -203,17 +204,18 @@ def experiment_2_simple_plotter(x_dict, y_dict, dataset):
 
 
 def experiment_2(dataset: str, embedding: str, hardware_acceleration: bool):
-    """
-    Runs experiment 2
+    """Runs experiment 2
 
-    :param dataset: dataset to test
-    :param embedding: embedding to test
-    :param hardware_acceleration: use GPU if true
+    Args:
+        dataset: Dataset to test.
+        embedding: Embedding to test.
+        hardware_acceleration: Use GPU if true
 
-    :return:
-        num_labels_dict: dictionary containing arrays of number of labels used.
-        acc_dict: dictionary containing array of accuracy.
+    Returns:
+        num_labels_dict: Dictionary containing arrays of number of labels used.
+        acc_dict: Dictionary containing array of accuracy.
     """
+
     assert dataset in utils.AVAILABLE_SAR_DATASETS, "Invalid dataset"
     assert embedding in utils.AVAILABLE_EMBEDDINGS, "Invalid embedding"
 
@@ -290,23 +292,24 @@ def experiment_3(
     num_experiments: int = EXPERIMENT_3_NUM_EXPERIMENTS,
     hardware_acceleration: bool = False,
 ):
-    """
-    Runs experiment 3
+    """Runs experiment 3
 
-    :param dataset: dataset to test
-    :param embedding: embedding to test
-    :param data_augmentation: use data augmentation if true
-    :param num_experiments: number of experiment to run
-    :param hardware_acceleration: use GPU if true
+    Args:
+        dataset: Dataset to test.
+        embedding: Embedding to test.
+        data_augmentation: Use data augmentation if true.
+        num_experiments: Number of experiments to run. Defaults to EXPERIMENT_3_NUM_EXPERIMENTS.
+        hardware_acceleration: Use GPU if true. Defaults to False.
 
-    :return: dictionary containing statistics about the experiment
-        "num_points": labels used by end of experiment
-        "experiments": num_experiments
-        "mean": mean accuracy
-        "std_dev": standard deviation of accuracy
-        "max": max accuracy
-        "data": accuracy data
+    Returns:
+        num_points: Labels used by end of experiment.
+        experiments: Num_experiments.
+        mean: Mean accuracy.
+        std_dev: Standard deviation of accuracy.
+        max: Max accuracy.
+        data: Accuracy data.
     """
+
     assert dataset in utils.AVAILABLE_SAR_DATASETS, "Invalid dataset"
     assert dataset != "mstar", "Invalid dataset: not testing MSTAR"
     assert embedding in utils.AVAILABLE_EMBEDDINGS, "Invalid embedding"
@@ -376,16 +379,19 @@ def experiment_3(
 
 
 def experiment_4(dataset, network, hardware_acceleration):
-    """
-    Runs experiment 4
+    """Runs experiment 4
 
-    :param dataset: dataset to test
-    :param network: neural network to use
-        refer to utils.PYTORCH_NEURAL_NETWORKS for full list
-    :param hardware_acceleration: use GPU if true
+    Args:
+        dataset: Dataset to test.
+        network:
+            Neural network to use.
+            Refer to utils.PYTORCH_NEURAL_NETWORKS for full list
+        hardware_acceleration: Use GPU if true.
 
-    :return: final accuracy
+    Returns:
+        final accuracy
     """
+
     assert dataset in utils.AVAILABLE_SAR_DATASETS, "Invalid dataset"
     assert dataset != "mstar", "Invalid dataset: not testing MSTAR"
     assert network in utils.PYTORCH_NEURAL_NETWORKS, "Invalid Neural Network"

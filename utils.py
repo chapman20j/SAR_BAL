@@ -62,8 +62,7 @@ PYTORCH_NEURAL_NETWORKS: List[str] = [
     "Wide ResNet",
 ]
 
-# Refer to https://pytorch.org/hub/research-models
-# for more information
+# Refer to https://pytorch.org/hub/research-models for more information
 PYTORCH_NEURAL_NETWORKS_DICT: Dict[str, str] = {
     "ResNet": "resnet18",
     "ShuffleNet": "shufflenet_v2_x0_5",
@@ -102,19 +101,20 @@ def cnnvae(
     knn_num: int = KNN_NUM,
     hardware_acceleration: bool = False,
 ) -> EmbeddingType:
-    """
-    Embeds the chosen dataset using a trained CNNVAE.
+    """Embeds the chosen dataset using a trained CNNVAE.
 
-    :param dataset: dataset to use
-    :param knn_num: node degree in knn graph
-    :param hardward_acceleration: use GPU if true
+    Args:
+        dataset: Dataset to use.
+        knn_num: Node degree in knn graph. Defaults to KNN_NUM.
+        hardware_acceleration: Use GPU if true. Defaults to False.
 
-    :return:
-        data: the encoded data
-        labels: the labels
-        knn_data: the knn_data computed with annoy algorithm from the encoded data
-        train_ind: a point from each class. Used later for coreset construction
+    Returns:
+        data: The encoded data.
+        labels: The labels.
+        knn_data: The knn_data computed with annoy algorithm from the encoded data.
+        train_ind: A point from each class. Used later for coreset construction.
     """
+
     assert dataset in AVAILABLE_SAR_DATASETS, "Invalid Dataset"
 
     # Load Dataset
@@ -163,19 +163,19 @@ def zero_shot_tl(
     hardware_acceleration: bool = False,
     network: Optional[str] = None,
 ) -> EmbeddingType:
-    """
-    Embeds the chosen dataset using zero-shot transfer learning.
+    """Embeds the chosen dataset using zero-shot transfer learning.
 
-    :param dataset: dataset to use
-    :param knn_num: node degree in knn graph
-    :param hardward_acceleration: use GPU if true
-    :param network: which network to use
+    Args:
+        dataset: Dataset to use.
+        knn_num: Node degree in knn graph. Defaults to KNN_NUM.
+        hardware_acceleration: Use GPU if true. Defaults to False.
+        network: Which network to use. Defaults to None.
 
-    :return:
-        data: the encoded data
-        labels: the labels
-        knn_data: the knn_data computed with annoy algorithm from the encoded data
-        train_ind: a point from each class. Used later for coreset construction
+    Returns:
+        data: The encoded data.
+        labels: The labels.
+        knn_data: The knn_data computed with annoy algorithm from the encoded data.
+        train_ind: A point from each class. Used later for coreset construction.
     """
     assert dataset in AVAILABLE_SAR_DATASETS, "Invalid Dataset"
 
@@ -214,21 +214,21 @@ def fine_tuned_tl(
     data_augmentation: bool = True,
     hardware_acceleration: bool = False,
 ) -> EmbeddingType:
-    """
-    Embeds the chosen dataset using fine-tuned transfer learning.
+    """Embeds the chosen dataset using fine-tuned transfer learning.
 
-    :param dataset: dataset to use
-    :param knn_num: node degree in knn graph
-    :param num_epochs: number of epochs for fine-tuning
-    :param network: neural network to use in embedding
-    :param data_augmentation: use data augmentation if true
-    :param hardward_acceleration: use GPU if true
+    Args:
+        dataset: Dataset to use.
+        knn_num: Node degree in knn graph. Defaults to KNN_NUM.
+        num_epochs: Number of epochs for fine-tuning. Defaults to TL_EPOCHS.
+        network: Neural network to use in embedding. Defaults to None.
+        data_augmentation: Use data augmentation if true. Defaults to True.
+        hardware_acceleration: Use GPU if true. Defaults to False.
 
-    :return:
-        data: the encoded data
-        labels: the labels
-        knn_data: the knn_data computed with annoy algorithm from the encoded data
-        train_ind: a point from each class. Used later for coreset construction
+    Returns:
+        data: The encoded data.
+        labels: The labels.
+        knn_data: The knn_data computed with annoy algorithm from the encoded data.
+        train_ind: A point from each class. Used later for coreset construction.
     """
     assert dataset in AVAILABLE_SAR_DATASETS, "Invalid Dataset"
 
@@ -475,13 +475,14 @@ def train_model(
 
 
 def _construct_tl_network(dataset: str, model_type: Optional[str]) -> nn.Module:
-    """
-    Modifies the pretrained PyTorch neural network for transfer learning.
+    """Modifies the pretrained PyTorch neural network for transfer learning.
 
-    :param dataset: name of the dataset
-    :param model_type: name of the neural network
+    Args:
+        dataset: Name of the dataset.
+        model_type: Name of the neural network.
 
-    :return: A new neural network
+    Returns:
+        Modified neural network
     """
     if model_type is None:
         if dataset == "open_sar_ship":
@@ -802,8 +803,8 @@ def encode_transfer_learning(
 
 
 ################################################################################
-### MSTAR Helper Functions
-##All code below is from MSTAR Github
+## MSTAR Helper Functions
+# All code below is from MSTAR Github
 
 
 def _load_mstar(root_dir="./data/MSTAR"):
@@ -881,6 +882,10 @@ def _polar_transform_mstar(mag, phase):
     data = np.stack((mag, real, imaginary), axis=1)
 
     return data
+
+
+################################################################################
+## Toy Datasets
 
 
 def gen_checkerboard_3(num_samples=500, randseed=123):
