@@ -298,7 +298,7 @@ def coreset_dijkstras(
 def _dac_plot_fun(
     data: np.ndarray, points_seen: np.ndarray, coreset: List[int], perim: List[int]
 ) -> None:
-    """Function for plotting the steps of the DAC algorithm. It first checks if
+    """Function for plotting the intermediate steps of the DAC algorithm. It first checks if
         the dataset is from a square. This indicates that it will use the
         parameters to make nice plots for figures in the paper (eg. larger
         red dots). If it is the square dataset, the plots are saved. The plots
