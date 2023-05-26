@@ -81,7 +81,7 @@ fastprogress==1.0.3
 fastrlock==0.8.1
 filelock==3.11.0
 firebase-admin==5.3.0
-Flask==2.2.3
+Flask==2.2.5
 flatbuffers==23.3.3
 flax==0.6.8
 folium==0.14.0
