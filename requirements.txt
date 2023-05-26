@@ -214,7 +214,7 @@ nest-asyncio==1.5.6
 networkx==3.1
 nibabel==3.0.2
 nltk==3.8.1
-notebook==6.4.8
+notebook==6.4.12
 numba==0.56.4
 numexpr==2.8.4
 numpy==1.22.4
