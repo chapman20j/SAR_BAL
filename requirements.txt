@@ -380,7 +380,7 @@ torchdata==0.6.0
 torchsummary==1.5.1
 torchtext==0.15.1
 torchvision @ https://download.pytorch.org/whl/cu118/torchvision-0.15.1%2Bcu118-cp39-cp39-linux_x86_64.whl
-tornado==6.3.2
+tornado==6.3.3
 tqdm==4.65.0
 traitlets==5.7.1
 triton==2.0.0
