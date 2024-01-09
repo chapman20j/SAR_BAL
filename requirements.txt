@@ -85,7 +85,7 @@ Flask==2.2.5
 flatbuffers==23.3.3
 flax==0.6.8
 folium==0.14.0
-fonttools==4.39.3
+fonttools==4.43.0
 frozendict==2.3.7
 fsspec==2023.4.0
 future==0.18.3
